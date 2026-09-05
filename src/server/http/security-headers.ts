@@ -27,11 +27,29 @@ export function gerarNonceCsp(): string {
  * inteiro em `next dev` (EvalError no console, CSS não aplicado). Teste C8
  * (`security-headers.test.ts`) cobre só a política de produção, que continua
  * sem `unsafe-eval`/`unsafe-inline`.
+ *
+ * `'strict-dynamic'` em `script-src` é obrigatório junto do nonce — receita
+ * oficial do Next.js pra CSP com nonce em App Router
+ * (nextjs.org/docs/app/building-your-application/configuring/content-security-policy).
+ * Sem ele, só o script raiz que carrega com o nonce é confiável; os demais
+ * `<script>` que o PRÓPRIO Next injeta em runtime (payload de hidratação por
+ * Suspense boundary, streaming de Server Components — cada um com hash
+ * SHA-256 diferente, gerado pelo conteúdo, não algo que dá pra colocar nonce
+ * neles individualmente) ficam bloqueados mesmo com o restante da CSP
+ * correto. `'strict-dynamic'` propaga a confiança do script com nonce pros
+ * scripts que ELE injeta dinamicamente — é assim que o navegador aceita os
+ * scripts internos do framework sem listar um hash por script (que muda a
+ * cada build). Navegadores que não suportam `strict-dynamic` (CSP Level 2)
+ * ignoram a palavra-chave e caem em `'self'`/nonce normalmente — por isso
+ * `'self'` continua listado, como fallback. Achado em uso real
+ * (`_conflitos.md`): sem isso, login em produção ficava com "Executing
+ * inline script violates..." pra cada script interno do Next, mesmo com o
+ * nonce presente e correto tanto na resposta quanto na requisição.
  */
 export function contentSecurityPolicy(nonce: string, dev: boolean): string {
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}'${dev ? " 'unsafe-eval'" : ''}`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${dev ? " 'unsafe-eval'" : ''}`,
     `style-src 'self'${dev ? " 'unsafe-inline'" : ''}`,
     "img-src 'self' data:",
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co",

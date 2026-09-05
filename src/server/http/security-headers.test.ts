@@ -33,6 +33,15 @@ describe('security-headers (SEC-CONF, teste C8)', () => {
     expect(csp).toContain("'nonce-nonce-de-teste'");
   });
 
+  it("script-src tem 'strict-dynamic' junto do nonce — sem isso os scripts que o próprio Next injeta em runtime (hash por conteúdo, não nonce) ficam bloqueados (achado em uso real)", () => {
+    const headers = new Headers();
+    aplicarHeadersSeguranca(headers, 'nonce-de-teste', false);
+    const csp = headers.get('Content-Security-Policy') ?? '';
+    expect(csp).toMatch(/script-src[^;]*'strict-dynamic'/);
+    // 'self' continua listado como fallback pra navegador CSP Level 2 (não suporta strict-dynamic).
+    expect(csp).toMatch(/script-src 'self'/);
+  });
+
   it('em dev, CSP libera unsafe-eval/unsafe-inline (HMR do Next); em produção continua sem eles', () => {
     const headersDev = new Headers();
     aplicarHeadersSeguranca(headersDev, 'nonce-de-teste', true);
