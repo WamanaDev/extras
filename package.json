@@ -38,7 +38,7 @@
     "clsx": "2.1.1",
     "exceljs": "^4.4.0",
     "lucide-react": "0.446.0",
-    "next": "15.0.3",
+    "next": "^15.5.25",
     "pdfkit": "^0.20.2",
     "react": "18.3.1",
     "react-dom": "18.3.1",
@@ -47,7 +47,7 @@
     "zod": "3.23.8"
   },
   "devDependencies": {
-    "@playwright/test": "1.48.0",
+    "@playwright/test": "^1.63.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.5.2",
@@ -60,7 +60,7 @@
     "@vitejs/plugin-react": "4.3.2",
     "autoprefixer": "10.4.20",
     "eslint": "8.57.1",
-    "eslint-config-next": "15.0.3",
+    "eslint-config-next": "^15.5.25",
     "jsdom": "^25.0.1",
     "postcss": "8.4.47",
     "prisma": "5.20.0",
