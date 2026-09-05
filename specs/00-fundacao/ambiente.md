@@ -17,7 +17,7 @@
 | `PIN_PEPPER` | server | Pepper do hash de PIN |
 | `UPSTASH_REDIS_REST_URL` | server | Rate limit |
 | `UPSTASH_REDIS_REST_TOKEN` | server | Rate limit |
-| `TZ` | ambos | `America/Sao_Paulo` |
+| `TZ` | ambos | `America/Sao_Paulo`. **Vercel**: nome reservado, não configurável via dashboard/`vercel.json` — a aplicação (`src/env.ts`) seta isso sozinha no boot, nada a configurar na plataforma. Só precisa estar em `.env.local` para dev local. |
 
 ## Regras
 

@@ -1428,3 +1428,13 @@ Cada subgrupo (Ímpar Diurno, Ímpar Noturno, Par Diurno, Par Noturno, Extras Di
 - PDF (`gerarPdf`) não tem conceito de coluna tabular (texto corrido por colaborador) — fora do escopo, mesma exclusão do item 43.
 
 Testes novos em `GradeEscala.test.tsx`/`EscalaImpressao.test.tsx` comparando a largura do `<col>` entre tabelas diferentes da mesma página/RT (devem ser idênticas, `Set(...).size === 1`), incluindo um caso com nome de colaborador propositalmente muito comprido pra provar que não infla a coluna só na própria tabela.
+
+## 45. Deploy na Vercel falhava: `TZ` é nome de variável reservado, não configurável na plataforma
+
+Usuário tentou configurar `TZ=America/Sao_Paulo` nas variáveis de ambiente do projeto na Vercel e a plataforma recusa — `TZ` é reservado (não dá pra cadastrar via dashboard nem `vercel.json`). Isso quebrava o build inteiro: `src/env.ts` exigia a variável e falhava ruidosamente no boot ("TZ deve ser exatamente 'America/Sao_Paulo'"), derrubando `next build` (a checagem roda no import de `env.ts`, disparado durante "Collecting page data" de rotas que o importam, ex. `exportar-dados`).
+
+`specs/00-fundacao/ambiente.md` (FUND-004) assumia que o operador configurava `TZ` na infraestrutura — premissa que não vale pra Vercel especificamente.
+
+**Corrigido**: `src/env.ts` agora AUTOCORRIGE `process.env.TZ = 'America/Sao_Paulo'` no topo do módulo, antes de qualquer validação — deixa de ser uma variável que a plataforma precisa fornecer. Roda antes de qualquer conta de data/hora em outro módulo, já que `env.ts` é importado cedo por praticamente toda rota de API. A validação Zod continua existindo (agora como sanity check pós-correção, não mais um requisito externo) — nunca mais falha o boot por causa disso. Em dev local, `.env.local`/`.env.example` continuam podendo definir `TZ` normalmente (arquivo `.env` não passa pela restrição de nome reservado da Vercel, só o dashboard/`vercel.json` da plataforma têm essa trava).
+
+Testes novos em `src/env.test.ts` (TZ ausente, errado, e já correto — todos os três terminam com `America/Sao_Paulo`, nenhum derruba o boot).

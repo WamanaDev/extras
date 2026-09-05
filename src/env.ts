@@ -9,6 +9,25 @@
  */
 import { z } from "zod";
 
+/**
+ * `TZ` é um nome de variável de ambiente RESERVADO na Vercel — não dá pra
+ * cadastrar `TZ=America/Sao_Paulo` no dashboard de projeto nem via
+ * `vercel.json` (`env`/`build.env`); a plataforma recusa/ignora. A spec
+ * original (`00-fundacao/ambiente.md`) assumia que o operador configurava
+ * isso na infraestrutura, o que quebra deploy na Vercel especificamente
+ * (achado em uso real — build falhava com "TZ deve ser exatamente
+ * 'America/Sao_Paulo'"). Em vez de exigir que a plataforma forneça a
+ * variável, a aplicação garante o fuso ela mesma, ANTES de qualquer outro
+ * código deste módulo (ou de qualquer um que o importe) rodar — precisa vir
+ * antes do `serverSchema.safeParse` abaixo, e antes de qualquer conta de
+ * data/hora em qualquer outro módulo, já que `src/env.ts` é importado cedo
+ * por praticamente toda rota de API. Nunca falha o boot por causa disso: a
+ * variável agora é auto-corrigida, não mais uma dependência externa.
+ */
+if (process.env.TZ !== "America/Sao_Paulo") {
+  process.env.TZ = "America/Sao_Paulo";
+}
+
 const serverSchema = z.object({
   DATABASE_URL: z
     .string()
@@ -29,8 +48,10 @@ const serverSchema = z.object({
   UPSTASH_REDIS_REST_TOKEN: z
     .string()
     .min(1, "UPSTASH_REDIS_REST_TOKEN é obrigatória"),
-  // Mensagem de erro clara sem depender da forma exata da API de
-  // customização de mensagem do Zod entre versões: valida com refine.
+  // Sanity check pós-autocorreção (ver bloco acima, antes deste schema) —
+  // não é mais uma variável que o operador precisa configurar na
+  // plataforma. Mensagem de erro clara sem depender da forma exata da API
+  // de customização de mensagem do Zod entre versões: valida com refine.
   TZ: z
     .string()
     .refine((value) => value === "America/Sao_Paulo", {
