@@ -1438,3 +1438,9 @@ Usuário tentou configurar `TZ=America/Sao_Paulo` nas variáveis de ambiente do 
 **Corrigido**: `src/env.ts` agora AUTOCORRIGE `process.env.TZ = 'America/Sao_Paulo'` no topo do módulo, antes de qualquer validação — deixa de ser uma variável que a plataforma precisa fornecer. Roda antes de qualquer conta de data/hora em outro módulo, já que `env.ts` é importado cedo por praticamente toda rota de API. A validação Zod continua existindo (agora como sanity check pós-correção, não mais um requisito externo) — nunca mais falha o boot por causa disso. Em dev local, `.env.local`/`.env.example` continuam podendo definir `TZ` normalmente (arquivo `.env` não passa pela restrição de nome reservado da Vercel, só o dashboard/`vercel.json` da plataforma têm essa trava).
 
 Testes novos em `src/env.test.ts` (TZ ausente, errado, e já correto — todos os três terminam com `America/Sao_Paulo`, nenhum derruba o boot).
+
+## 46. Deploy na Vercel falhava: `@prisma/client` nunca era gerado no build (faltava `postinstall`)
+
+Erro na Vercel: `PrismaClientInitializationError` ao coletar dados da página `/api/admin/colaboradores/[id]/exportar-dados` (`Learn how: https://pris.ly/d/vercel-build`) — o Prisma Client fica desatualizado/nunca é criado porque `node_modules/@prisma/client` só é populado por `prisma generate`, e nada no `package.json` rodava isso durante o build da Vercel (só `next build`, sem passo de geração antes). Localmente isso nunca aparecia porque `npx prisma generate` era rodado manualmente sempre que o schema mudava (ver itens 40/41 desta sessão).
+
+**Corrigido**: `package.json` ganhou `"postinstall": "prisma generate"` — roda automaticamente logo após `npm install`, antes de `next build`, em qualquer ambiente (Vercel incluído). É a correção oficial documentada no link do próprio erro. `prisma` (CLI) já estava em `devDependencies`, que a Vercel instala por padrão no passo de build (não passa `--production`), então nada mais precisou mudar.
