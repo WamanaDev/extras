@@ -28,7 +28,7 @@ export function gerarNonceCsp(): string {
  * (`security-headers.test.ts`) cobre só a política de produção, que continua
  * sem `unsafe-eval`/`unsafe-inline`.
  */
-function contentSecurityPolicy(nonce: string, dev: boolean): string {
+export function contentSecurityPolicy(nonce: string, dev: boolean): string {
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}'${dev ? " 'unsafe-eval'" : ''}`,
