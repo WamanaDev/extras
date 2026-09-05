@@ -1,0 +1,482 @@
+// ============================================================================
+// DB-001 — Modelo de dados (specs/03-banco/modelo-dados.md)
+// ============================================================================
+// Preenchido pelo Agente D (Onda 1). Fonte única: specs/03-banco/modelo-dados.md
+// + specs/CONVENTIONS.md (nomenclatura) + specs/04-api/**/*.md (campos de
+// contrato) + specs/02-seguranca/**/*.md (colunas de segurança/auditoria).
+//
+// O que este arquivo NÃO modela, de propósito (MG-8 — vive em SQL cru dentro
+// de migration, nunca no Prisma):
+//   - Unique constraints "de negócio" (marcacao_unica_confirmada, escala_dia_unica,
+//     plantao_unico, ciclo_unico, participacao_unica, colaborador_matricula,
+//     sessao_token) e todos os CHECK — isso é DB-002 (03-banco/constraints.md),
+//     escopo do Agente F (reviewer), não deste agente. Ver header de
+//     prisma/migrations/*_constraints/migration.sql.
+//   - Exclusion constraints (`EXCLUDE USING gist`) — Prisma não modela esse
+//     objeto; SQL cru em *_constraints (a parte que a Onda 0/segurança já
+//     tinha escrito antes deste agente rodar).
+//   - Triggers (`preencher_intervalo`, `copiar_intervalo_marcacao`,
+//     `tocar_atualizado_em`) — DB-003 (03-banco/triggers.md), Agente F.
+//   - Índices de performance — DB-004 (03-banco/indices.md), agente de índices.
+//   - Funções PL/pgSQL — 03-banco/funcoes/*, agentes FN-*.
+//   - RLS — SEC-RLS, já implementada pela Onda 0 (segurança), só reordenada.
+//
+// Por isso colunas como `inicio_em`/`fim_em` (calculadas por trigger, nunca
+// pela aplicação — SEC-INT, "Integridade temporal") ganham `@default(now())`
+// aqui: não porque a aplicação deva escrevê-las, mas para que o Prisma Client
+// não *exija* o campo em `create()` — o trigger (BEFORE INSERT) sobrescreve o
+// valor de qualquer forma antes da linha ser gravada. O default é só uma
+// válvula de escape de tipagem, nunca a fonte do valor real.
+//
+// `ADMIN` não é tabela própria: FUND-003 define "Auth admin: Supabase Auth +
+// MFA" — a identidade do admin vive em `auth.users` (schema gerenciado pelo
+// Supabase), fora deste schema.prisma. `audit_log.ator_id` e
+// `marcacao.origem` não têm FK para uma tabela "admin" porque ela não existe
+// aqui; é o uuid de `auth.users` quando `ator_tipo = ADMIN`.
+//
+// DATABASE_URL usa o pooler em modo transaction (:6543, pgbouncer=true).
+// DIRECT_URL é usado só por `prisma migrate` (:5432). Ver specs/00-fundacao/ambiente.md.
+//
+// Regra do contrato (specs/AGENTS.md): SQL só via migration versionada em
+// prisma/migrations/. `prisma db push` é proibido.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ----------------------------------------------------------------------------
+// Enums (002_enums)
+// ----------------------------------------------------------------------------
+
+/// Turno de 12h. Diurno [07:00,19:00); noturno [19:00,07:00+1) — DOM-001/FUND-002.
+/// Reaproveitado em `colaborador.turnoPadrao`, `troca_escala.turno` e `plantao.tipo`.
+enum Turno {
+  DIURNO
+  NOTURNO
+
+  @@map("turno")
+}
+
+/// Ciclo de vida da competência mensal — RN-25, API-ADM-CIC-005/006.
+enum StatusCiclo {
+  RASCUNHO
+  PUBLICADO
+  FECHADO
+
+  @@map("status_ciclo")
+}
+
+/// Cancelamento é sempre UPDATE de status, nunca DELETE (SEC-CONF, API-COL-005).
+enum StatusMarcacao {
+  CONFIRMADA
+  CANCELADA
+
+  @@map("status_marcacao")
+}
+
+/// De onde veio a marcação — RN-27 (ADMIN pula só a checagem de janela).
+enum OrigemMarcacao {
+  COLABORADOR
+  ADMIN
+
+  @@map("origem_marcacao")
+}
+
+/// Ator de uma ação auditada — SEC-AUD.
+enum AtorTipo {
+  COLABORADOR
+  ADMIN
+
+  @@map("ator_tipo")
+}
+
+// ----------------------------------------------------------------------------
+// Referência (003_tabelas)
+// ----------------------------------------------------------------------------
+
+/// Unidade residencial. RT1 e RT2 — FUND-002.
+model Rt {
+  id       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome     String
+  ativo    Boolean  @default(true)
+  criadoEm DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
+
+  /// Mínimo de pessoas presentes no turno diurno para não gerar déficit
+  /// (DOM-003.4, FN-009 cobertura_ciclo). Coluna adicionada por
+  /// 20260101000007_funcoes (agente G9) — não existia em nenhuma migration
+  /// anterior; ver _conflitos.md item 10. `0` = sem mínimo configurado, nunca
+  /// gera déficit até o admin definir um valor real.
+  coberturaMinimaDiurno  Int @default(0) @map("cobertura_minima_diurno")
+  /// idem, turno noturno.
+  coberturaMinimaNoturno Int @default(0) @map("cobertura_minima_noturno")
+
+  colaboradores Colaborador[]
+  plantoes      Plantao[]
+
+  @@map("rt")
+}
+
+/// D, F, FT, FE + códigos criados pelo admin — DOM-003. Tabela, não enum.
+model CodigoEscala {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  codigo       String
+  descricao    String
+  /// Esta pessoa cobre o plantão? (impressão, cobertura mínima — DOM-003.4)
+  presenca     Boolean
+  /// Esta pessoa está comprometida no intervalo? (regra de descanso — DOM-002)
+  ocupaHorario Boolean  @map("ocupa_horario")
+  remunerada   Boolean
+  /// Desativado não aparece para lançamento novo, mas permanece em uso histórico (DOM-003.5).
+  ativo        Boolean  @default(true)
+  /// Código fixo/padrão do sistema (D, F, FE — DOM-003.6): não pode ter flags alteradas nem ser desativado/excluído. Códigos criados pelo admin nascem sempre com `false`.
+  bloqueado    Boolean  @default(false)
+  /// Contraste mínimo 4.5:1 sobre branco — legenda/badge.
+  cor          String
+  criadoEm     DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
+
+  escalasDia EscalaDia[]
+
+  @@map("codigo_escala")
+}
+
+// ----------------------------------------------------------------------------
+// Pessoas (003_tabelas)
+// ----------------------------------------------------------------------------
+
+model Colaborador {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  matricula String
+  nome      String
+
+  rtId String @map("rt_id") @db.Uuid
+
+  // Escala base (DOM-001): âncora + periodicidade + turno padrão. Troca de
+  // escala nunca sobrescreve estes campos — cria linha em `troca_escala`.
+  turnoPadrao      Turno     @map("turno_padrao")
+  escalaAncora     DateTime  @map("escala_ancora") @db.Date
+  escalaPeriodo    Int       @default(2) @map("escala_periodo")
+  escalaHoraInicio DateTime? @map("escala_hora_inicio") @db.Time(6)
+  escalaHoraFim    DateTime? @map("escala_hora_fim") @db.Time(6)
+
+  // Autenticação própria (matrícula + PIN — RN-29..34, SEC-CONF).
+  pinHash          String?   @map("pin_hash")
+  precisaTrocarPin Boolean   @default(true) @map("precisa_trocar_pin")
+  pinDefinidoEm    DateTime? @map("pin_definido_em") @db.Timestamptz(6)
+  tentativasFalhas Int       @default(0) @map("tentativas_falhas")
+  bloqueadoAte     DateTime? @map("bloqueado_ate") @db.Timestamptz(6)
+
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
+  /// Tocado por trigger `tocar_atualizado_em` (DB-003) — a aplicação não escreve aqui.
+  atualizadoEm DateTime @default(now()) @map("atualizado_em") @db.Timestamptz(6)
+
+  rt Rt @relation(fields: [rtId], references: [id], onDelete: Restrict)
+
+  escalasDia        EscalaDia[]
+  marcacoes         Marcacao[]
+  trocasEscala      TrocaEscala[]       @relation("TrocaEscalaColaborador")
+  sessoes           SessaoColaborador[]
+  tentativasLogin   TentativaLogin[]
+  participacoes     ParticipacaoCiclo[]
+  notificacoes      Notificacao[]
+  pushSubscriptions PushSubscription[]
+
+  @@map("colaborador")
+}
+
+/// Histórico de âncora — nunca se edita a âncora no lugar (DOM-001, RN-03, API-ADM-COL-006).
+model TrocaEscala {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  colaboradorId  String   @map("colaborador_id") @db.Uuid
+  vigenciaInicio DateTime @map("vigencia_inicio") @db.Date
+  turno          Turno
+  ancora         DateTime @db.Date
+  periodo        Int      @default(2)
+  /// Obrigatório — troca de escala mexe na vida da pessoa (API-ADM-COL-006).
+  motivo         String
+  /// Admin que registrou a troca (uuid de `auth.users`, sem FK — ver header do arquivo).
+  criadoPorId    String?  @map("criado_por_id") @db.Uuid
+  criadoEm       DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
+
+  colaborador Colaborador @relation("TrocaEscalaColaborador", fields: [colaboradorId], references: [id], onDelete: Cascade)
+
+  @@map("troca_escala")
+}
+
+// ----------------------------------------------------------------------------
+// Ciclo / escala / plantão / marcação (003_tabelas)
+// ----------------------------------------------------------------------------
+
+/// Competência mensal — agrupa escala, plantões e limites (FUND-002).
+model Ciclo {
+  id     String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ano    Int
+  mes    Int
+  status StatusCiclo @default(RASCUNHO)
+
+  limitePadrao        Int       @map("limite_padrao")
+  permiteCruzada      Boolean   @default(true) @map("permite_cruzada")
+  permiteExtraEmFolga Boolean   @default(false) @map("permite_extra_em_folga")
+  maxBlocosSeguidos   Int       @default(2) @map("max_blocos_seguidos")
+  aberturaMarcacao    DateTime? @map("abertura_marcacao") @db.Timestamptz(6)
+  fechamentoMarcacao  DateTime? @map("fechamento_marcacao") @db.Timestamptz(6)
+  /// Preenchido por FN-002 (gerar_escala_mensal). Pré-condição de publicação (API-ADM-CIC-005).
+  escalaGeradaEm      DateTime? @map("escala_gerada_em") @db.Timestamptz(6)
+
+  criadoEm     DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
+  /// Tocado por trigger `tocar_atualizado_em` (DB-003).
+  atualizadoEm DateTime @default(now()) @map("atualizado_em") @db.Timestamptz(6)
+
+  escalasDia    EscalaDia[]
+  plantoes      Plantao[]
+  participacoes ParticipacaoCiclo[]
+
+  @@map("ciclo")
+}
+
+/// Escala base materializada (D-04): ausências precisam de linha para editar/imprimir.
+model EscalaDia {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  colaboradorId  String @map("colaborador_id") @db.Uuid
+  cicloId        String @map("ciclo_id") @db.Uuid
+  codigoEscalaId String @map("codigo_escala_id") @db.Uuid
+
+  data       DateTime  @db.Date
+  horaInicio DateTime? @map("hora_inicio") @db.Time(6)
+  horaFim    DateTime? @map("hora_fim") @db.Time(6)
+
+  /// Calculado por trigger `preencher_intervalo` (DB-003) — nunca escrito pela aplicação.
+  inicioEm DateTime @default(now()) @map("inicio_em") @db.Timestamptz(6)
+  /// idem
+  fimEm    DateTime @default(now()) @map("fim_em") @db.Timestamptz(6)
+
+  /// Restrito ao admin (SEC-CONF) — costuma conter informação de saúde.
+  observacao String?
+
+  criadoEm     DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
+  /// Tocado por trigger `tocar_atualizado_em` (DB-003).
+  atualizadoEm DateTime @default(now()) @map("atualizado_em") @db.Timestamptz(6)
+
+  colaborador  Colaborador  @relation(fields: [colaboradorId], references: [id], onDelete: Cascade)
+  ciclo        Ciclo        @relation(fields: [cicloId], references: [id], onDelete: Cascade)
+  /// RESTRICT: código em uso não se apaga (DOM-003.5).
+  codigoEscala CodigoEscala @relation(fields: [codigoEscalaId], references: [id], onDelete: Restrict)
+
+  @@map("escala_dia")
+}
+
+/// Vaga extra ofertada (voluntária, além da escala base).
+model Plantao {
+  id      String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cicloId String @map("ciclo_id") @db.Uuid
+  rtId    String @map("rt_id") @db.Uuid
+
+  data       DateTime @db.Date
+  tipo       Turno
+  horaInicio DateTime @map("hora_inicio") @db.Time(6)
+  horaFim    DateTime @map("hora_fim") @db.Time(6)
+
+  /// Calculado por trigger `preencher_intervalo` (DB-003) — nunca escrito pela aplicação.
+  inicioEm DateTime @default(now()) @map("inicio_em") @db.Timestamptz(6)
+  /// idem
+  fimEm    DateTime @default(now()) @map("fim_em") @db.Timestamptz(6)
+
+  cargaHoras Int @map("carga_horas")
+
+  vagasTotais   Int @map("vagas_totais")
+  /// Denormalizado (D-03): realtime sem expor `marcacao`. Reconciliado a cada 10min (SEC-INT).
+  vagasOcupadas Int @default(0) @map("vagas_ocupadas")
+
+  /// `null` = herda do ciclo; distinto de `false` (API-ADM-PLA-001).
+  permiteCruzada Boolean? @map("permite_cruzada")
+  /// `false` em vez de DELETE — histórico das marcações precisa apontar para plantão existente.
+  ativo          Boolean  @default(true)
+  observacao     String?
+
+  criadoEm     DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
+  /// Tocado por trigger `tocar_atualizado_em` (DB-003) — mencionado em DB-003 como candidato,
+  /// confirmar aplicação em `plantao` quando Agente F escrever o trigger real.
+  atualizadoEm DateTime @default(now()) @map("atualizado_em") @db.Timestamptz(6)
+
+  ciclo     Ciclo      @relation(fields: [cicloId], references: [id], onDelete: Cascade)
+  rt        Rt         @relation(fields: [rtId], references: [id], onDelete: Restrict)
+  marcacoes Marcacao[]
+
+  @@map("plantao")
+}
+
+/// Extra marcada por um colaborador (ou em nome dele, por admin — RN-27).
+model Marcacao {
+  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  plantaoId     String         @map("plantao_id") @db.Uuid
+  colaboradorId String         @map("colaborador_id") @db.Uuid
+  status        StatusMarcacao @default(CONFIRMADA)
+  origem        OrigemMarcacao
+
+  /// `participacao` → `plantao` → `ciclo` → `false` (RN-20). Gravado na inserção,
+  /// não recalculado — reflete a lotação do colaborador no momento da marcação.
+  cruzada Boolean
+
+  /// Copiado do plantão por trigger `copiar_intervalo_marcacao` (DB-003) — necessário
+  /// para a exclusion constraint, que não aceita subquery (SEC-ACID).
+  inicioEm DateTime @default(now()) @map("inicio_em") @db.Timestamptz(6)
+  /// idem
+  fimEm    DateTime @default(now()) @map("fim_em") @db.Timestamptz(6)
+
+  /// Obrigatório quando `origem = ADMIN` (API-ADM-MAR-002).
+  motivo String?
+
+  criadoEm    DateTime  @default(now()) @map("criado_em") @db.Timestamptz(6)
+  /// Cancelamento é UPDATE de status, nunca DELETE (SEC-CONF).
+  canceladoEm DateTime? @map("cancelado_em") @db.Timestamptz(6)
+
+  plantao     Plantao     @relation(fields: [plantaoId], references: [id], onDelete: Cascade)
+  /// RESTRICT: histórico não se perde mesmo se o colaborador for removido (modelo-dados.md).
+  colaborador Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Restrict)
+
+  @@map("marcacao")
+}
+
+/// Override por colaborador dentro de um ciclo (limite, cruzada, bloqueio — API-ADM-PAR-001).
+model ParticipacaoCiclo {
+  id            String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cicloId       String @map("ciclo_id") @db.Uuid
+  colaboradorId String @map("colaborador_id") @db.Uuid
+
+  /// `null` = herda `ciclo.limitePadrao` (RN-21).
+  limiteOverride Int?     @map("limite_override")
+  /// `null` = herda a regra do ciclo.
+  permiteCruzada Boolean? @map("permite_cruzada")
+  bloqueado      Boolean  @default(false)
+  /// Obrigatório em bloqueio e em redução de limite (API-ADM-PAR-001).
+  motivo         String?
+
+  criadoEm     DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
+  atualizadoEm DateTime @default(now()) @map("atualizado_em") @db.Timestamptz(6)
+
+  ciclo       Ciclo       @relation(fields: [cicloId], references: [id], onDelete: Cascade)
+  colaborador Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Cascade)
+
+  @@map("participacao_ciclo")
+}
+
+// ----------------------------------------------------------------------------
+// Autenticação / auditoria (003_tabelas)
+// ----------------------------------------------------------------------------
+
+/// Sessão do colaborador — 8h, deslizante até 12h, revogável (RN-32).
+model SessaoColaborador {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  colaboradorId String    @map("colaborador_id") @db.Uuid
+  /// Só o SHA-256 do token de 32 bytes vai ao banco (SEC-CONF).
+  tokenHash     String    @map("token_hash")
+  criadoEm      DateTime  @default(now()) @map("criado_em") @db.Timestamptz(6)
+  expiraEm      DateTime  @map("expira_em") @db.Timestamptz(6)
+  revogadaEm    DateTime? @map("revogada_em") @db.Timestamptz(6)
+  ip            String?
+  userAgent     String?   @map("user_agent")
+
+  colaborador Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Cascade)
+
+  @@map("sessao_colaborador")
+}
+
+/// Toda tentativa de login (sucesso ou falha) — expurgo em 90 dias (SEC-CONF).
+model TentativaLogin {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// `SET NULL`: tentativa pode ser de matrícula inexistente (modelo-dados.md).
+  colaboradorId String?  @map("colaborador_id") @db.Uuid
+  matricula     String
+  sucesso       Boolean
+  motivo        String?
+  ip            String
+  userAgent     String?  @map("user_agent")
+  criadoEm      DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
+
+  colaborador Colaborador? @relation(fields: [colaboradorId], references: [id], onDelete: SetNull)
+
+  @@map("tentativa_login")
+}
+
+/// Trilha append-only com cadeia de hash — SEC-AUD/SEC-INT. Retenção 5 anos.
+model AuditLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  atorTipo   AtorTipo @map("ator_tipo")
+  /// uuid de `colaborador` ou de `auth.users` (admin) conforme `atorTipo` — sem FK
+  /// de propósito: sobrevive à remoção física e à anonimização pós-retenção (AUD-6).
+  atorId     String?  @map("ator_id") @db.Uuid
+  acao       String
+  entidade   String
+  /// Polimórfico (aponta para linha de tabelas variadas) — sem FK de propósito.
+  entidadeId String?  @map("entidade_id") @db.Uuid
+  /// Antes e depois da alteração. Nunca CPF/PIN/token — redigido antes da gravação (SEC-CONF).
+  payload    Json
+  ip         String?
+  userAgent  String?  @map("user_agent")
+  /// Correlaciona com o log de aplicação (AUD-5).
+  requestId  String?  @map("request_id")
+  criadoEm   DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
+
+  /// Cadeia de hash (SEC-INT): hash da linha anterior. `NULL`/GENESIS na primeira linha.
+  hashAnterior String? @map("hash_anterior")
+  /// sha256(hashAnterior || id || atorId || acao || entidadeId || payload::text || criadoEm).
+  /// Calculado em src/server/audit/hash-chain.ts, nunca no banco.
+  hash         String
+
+  @@map("audit_log")
+}
+
+// ----------------------------------------------------------------------------
+// Notificações / push (preparação de infra — ver docstring de
+// src/server/notificacoes/criar.ts: sem gatilho de negócio ainda, só a base
+// pronta para uma etapa futura chamar).
+// ----------------------------------------------------------------------------
+
+/// Notificação in-app do colaborador (sino no painel). `tipo` é livre por
+/// enquanto — nenhum gatilho de negócio a preenche ainda (ex. futuramente
+/// "PLANTAO_DISPONIVEL", "ESCALA_PUBLICADA").
+model Notificacao {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  colaboradorId String    @map("colaborador_id") @db.Uuid
+  tipo          String
+  titulo        String
+  mensagem      String
+  /// Para onde navegar ao clicar (rota do app), opcional.
+  link          String?
+  lida          Boolean   @default(false)
+  lidaEm        DateTime? @map("lida_em") @db.Timestamptz(6)
+  criadoEm      DateTime  @default(now()) @map("criado_em") @db.Timestamptz(6)
+
+  colaborador Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Cascade)
+
+  /// Listagem rápida de não lidas por colaborador.
+  @@index([colaboradorId, lida])
+  /// Listagem rápida ordenada por mais recente.
+  @@index([colaboradorId, criadoEm])
+  @@map("notificacao")
+}
+
+/// Subscription de Web Push do navegador do colaborador (um por dispositivo/navegador).
+model PushSubscription {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  colaboradorId String   @map("colaborador_id") @db.Uuid
+  /// A própria URL do endpoint é o identificador único da subscription (Web Push API).
+  endpoint      String   @unique
+  /// Chave pública da subscription (`keys.p256dh`).
+  p256dh        String
+  /// Chave auth da subscription (`keys.auth`).
+  auth          String
+  userAgent     String?  @map("user_agent")
+  criadoEm      DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
+
+  colaborador Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Cascade)
+
+  @@map("push_subscription")
+}

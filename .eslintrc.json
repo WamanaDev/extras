@@ -1,0 +1,21 @@
+{
+  "extends": "next/core-web-vitals",
+  "plugins": ["@typescript-eslint"],
+  "rules": {
+    "@typescript-eslint/no-explicit-any": "error"
+  },
+  "overrides": [
+    {
+      "files": ["src/app/api/**/route.ts"],
+      "rules": {
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "ExportNamedDeclaration[declaration.type='VariableDeclaration'] > VariableDeclaration > VariableDeclarator[init.type!='CallExpression'], ExportNamedDeclaration[declaration.type='VariableDeclaration'] > VariableDeclaration > VariableDeclarator[init.callee.name!=/^(defineHandler|criarHandler\\w+)$/]",
+            "message": "Toda rota (GET/POST/PUT/PATCH/DELETE exportado de route.ts) deve ser declarada via defineHandler (API-000, src/server/http/handler.ts). Um handler sem defineHandler pula requestId, rate limit, autenticação, autorização e log de auditoria."
+          }
+        ]
+      }
+    }
+  ]
+}

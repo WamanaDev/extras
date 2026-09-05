@@ -1,0 +1,33 @@
+# Ambiente de dev local. Nunca recebe dump de produção
+# (specs/02-seguranca/confidencialidade.md, seção "Dados em ambientes não-produtivos").
+#
+# Sobe um Postgres 15 local expondo tanto a porta "direta" (5432, usada por
+# `prisma migrate`) quanto uma porta de "pooler" (6543) para espelhar o
+# comportamento do Supabase em produção (DATABASE_URL vs DIRECT_URL). Sem
+# PgBouncer real aqui — em dev local as duas portas apontam para a mesma
+# instância; o que importa é o app já falar com DATABASE_URL/DIRECT_URL
+# separados desde o início.
+
+services:
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: extras
+      TZ: America/Sao_Paulo
+      PGTZ: America/Sao_Paulo
+    ports:
+      - "5432:5432"
+      - "6543:5432"
+    volumes:
+      - extras_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d extras"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  extras_db_data:
