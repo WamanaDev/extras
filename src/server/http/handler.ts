@@ -107,7 +107,7 @@ export type SessaoResolvida = AtorColaborador | AtorAdmin;
  * Toda spec/teste que não quiser tocar sessão real injeta seu próprio
  * `resolverSessao` via `criarDefineHandler`.
  */
-export type ResolverSessao = (request: NextRequest, ip: string) => Promise<SessaoResolvida | null>;
+export type ResolverSessao = (request: NextRequest, ip: string, atorEsperado: TipoAtorRota) => Promise<SessaoResolvida | null>;
 
 /**
  * Implementação padrão — assume um cookie `sessao_colaborador` (nome
@@ -169,14 +169,34 @@ async function resolverSessaoAdmin(request: NextRequest): Promise<AtorAdmin | nu
   return { tipo: 'ADMIN', adminId: data.user.id, email: data.user.email ?? null, nome };
 }
 
-/** Resolvedor padrão: tenta colaborador (cookie próprio) e admin (Supabase) — o primeiro que resolver vence. */
-export async function resolverSessaoPadrao(request: NextRequest): Promise<SessaoResolvida | null> {
-  const tokenColaborador = request.cookies.get('sessao_colaborador')?.value;
-  if (tokenColaborador) {
-    const sessao = await resolverSessaoColaborador(tokenColaborador);
-    if (sessao) return sessao;
+/**
+ * Resolvedor padrão: tenta colaborador (cookie próprio) e admin (Supabase).
+ *
+ * A ORDEM importa quando as duas sessões existem ao mesmo tempo no mesmo
+ * navegador (comum em teste manual — alguém loga como colaborador numa aba
+ * e como admin noutra, ambos os cookies ficam válidos no mesmo domínio).
+ * Sem `atorEsperado`, o resolvedor sempre testava colaborador primeiro,
+ * incondicionalmente: uma rota `ator: 'ADMIN'` com um cookie de colaborador
+ * válido no navegador recebia de volta a sessão de COLABORADOR e nunca
+ * chegava a checar o cookie de admin (Supabase) — derrubando toda rota
+ * admin com `403 SEM_PERMISSAO` mesmo com login de admin correto e válido
+ * (achado em uso real, `_conflitos.md`). Agora tenta primeiro o tipo que a
+ * rota exige — só cai pro outro tipo quando a rota aceita `'QUALQUER'` sessão.
+ */
+export async function resolverSessaoPadrao(request: NextRequest, _ip: string, atorEsperado: TipoAtorRota): Promise<SessaoResolvida | null> {
+  async function tentarColaborador(): Promise<SessaoResolvida | null> {
+    const tokenColaborador = request.cookies.get('sessao_colaborador')?.value;
+    return tokenColaborador ? resolverSessaoColaborador(tokenColaborador) : null;
   }
-  return resolverSessaoAdmin(request);
+
+  if (atorEsperado === 'ADMIN') {
+    return (await resolverSessaoAdmin(request)) ?? (await tentarColaborador());
+  }
+  if (atorEsperado === 'COLABORADOR') {
+    return (await tentarColaborador()) ?? resolverSessaoAdmin(request);
+  }
+  // 'QUALQUER'/'PUBLICO': ordem histórica, colaborador primeiro.
+  return (await tentarColaborador()) ?? resolverSessaoAdmin(request);
 }
 
 // ----------------------------------------------------------------------------
@@ -429,7 +449,7 @@ export function criarDefineHandler(dependenciasParciais: Partial<DependenciasHan
         // --- 3. autenticação ----------------------------------------------
         let sessao: SessaoResolvida | null = null;
         if (config.ator !== 'PUBLICO') {
-          sessao = await deps.resolverSessao(request, ip);
+          sessao = await deps.resolverSessao(request, ip, config.ator);
           if (!sessao) {
             throw erroNaoAutenticado();
           }

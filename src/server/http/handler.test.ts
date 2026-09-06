@@ -210,6 +210,17 @@ describe('defineHandler — autenticação e autorização', () => {
     expect((await response.json()).erro).toBe('SEM_PERMISSAO');
   });
 
+  it('repassa `config.ator` como 3º argumento de `resolverSessao` — é assim que `resolverSessaoPadrao` sabe priorizar admin vs. colaborador quando os dois cookies existem no mesmo navegador (achado em uso real, `_conflitos.md`)', async () => {
+    const resolverSessao = vi.fn(async () => ADMIN);
+    const { deps } = criarDeps({ resolverSessao });
+    const defineHandler = criarDefineHandler(deps);
+    const GET = defineHandler({ ator: 'ADMIN', cache: 'pessoal', handler: async () => ({ ok: true }) });
+
+    await GET(req('http://localhost/api/admin/x'), { params: Promise.resolve({}) });
+
+    expect(resolverSessao).toHaveBeenCalledWith(expect.anything(), expect.any(String), 'ADMIN');
+  });
+
   it('sessão de colaborador batendo em rota ator: ADMIN → 403', async () => {
     const { deps } = criarDeps({ resolverSessao: vi.fn(async () => COLABORADOR) });
     const defineHandler = criarDefineHandler(deps);
