@@ -22,7 +22,7 @@ import { erroNaoEncontrado, erroDeNegocio, ErroHttp } from '@/server/http/erros'
 import { emTransacao, travarColaborador, type ClienteTransacao } from '@/server/db/tx';
 import { registrarAuditoria } from '@/server/audit/registrar';
 import { previewMeses } from '@/lib/escala/ancora';
-import { obterPrisma, parseDataCivil, formatarDataCivil } from '@/server/services/colaboradores';
+import { obterPrisma, parseDataCivil, formatarDataCivil, hojeCivilSaoPaulo } from '@/server/services/colaboradores';
 
 const ParamsSchema = z.object({ id: z.string().uuid() });
 
@@ -124,7 +124,7 @@ function criarHandlerTrocarEscala(prisma: PrismaClient) {
       const ancora = parseDataCivil(body.ancora);
       if (!ancora) throw new ErroHttp({ status: 422, codigo: 'ANCORA_INVALIDA', mensagem: 'Data de âncora inválida.', detalhes: { ancora: 'Use o formato AAAA-MM-DD.' } });
 
-      const hoje = new Date(Date.UTC(ctx.agora.getUTCFullYear(), ctx.agora.getUTCMonth(), ctx.agora.getUTCDate()));
+      const hoje = hojeCivilSaoPaulo(ctx.agora);
       if (vigenciaInicio.getTime() < hoje.getTime()) {
         throw erroDeNegocio('A vigência não pode ser retroativa.', 'VIGENCIA_NO_PASSADO');
       }

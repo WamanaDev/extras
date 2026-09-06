@@ -1,6 +1,9 @@
 # Índice de specs
 
-94 documentos. 🔒 = alteração exige revisão humana (`AGENTS.md`).
+124 documentos. 🔒 = alteração exige revisão humana (`AGENTS.md`).
+
+> Specs marcadas `RASCUNHO` no bloco "Módulo de pacientes" (final da tabela) são plano, ainda
+> sem implementação — sub-agente não pega spec `RASCUNHO` (`README.md` "Estado").
 
 | ID | Spec | Status | |
 |---|---|---|---|
@@ -98,3 +101,37 @@
 | `OPS-001` | [Deploy](08-operacao/deploy.md) | PRONTA |  |
 | `OPS-002` | [Observabilidade](08-operacao/observabilidade.md) | PRONTA |  |
 | `OPS-003` | [Runbook de incidentes](08-operacao/runbook-incidentes.md) | PRONTA |  |
+| **Módulo de pacientes** |  |  |  |
+| `FUND-005` | [Visão geral — módulo de pacientes](00-fundacao/visao-geral-pacientes.md) | RASCUNHO |  |
+| `DOM-005` | [Modelo de cuidados — pacientes, agendamentos, medicamentos](01-dominio/pacientes-modelo.md) | RASCUNHO |  |
+| `DOM-006` | [Catálogo de regras de negócio — pacientes](01-dominio/regras-negocio-pacientes.md) | RASCUNHO |  |
+| `SEC-SAUDE` | [Dados sensíveis de saúde](02-seguranca/dados-sensiveis-saude.md) | RASCUNHO | 🔒 |
+| `DB-006` | [Modelo de dados — pacientes](03-banco/modelo-dados-pacientes.md) | RASCUNHO |  |
+| `DB-007` | [Constraints — pacientes](03-banco/constraints-pacientes.md) | RASCUNHO | 🔒 |
+| `FN-010` | [FN-010 — `criar_agendamento`](03-banco/funcoes/fn-010-criar-agendamento.md) | RASCUNHO |  |
+| `FN-011` | [FN-011 — `cancelar_agendamento`](03-banco/funcoes/fn-011-cancelar-agendamento.md) | RASCUNHO |  |
+| `FN-012` | [FN-012 — `registrar_administracao`](03-banco/funcoes/fn-012-registrar-administracao.md) | RASCUNHO | 🔒 |
+| `FN-013` | [FN-013 — `agenda_rt`](03-banco/funcoes/fn-013-agenda-rt.md) | RASCUNHO |  |
+| `FN-014` | [FN-014 — `alertas_medicamento`](03-banco/funcoes/fn-014-alertas-medicamento.md) | RASCUNHO |  |
+| `API-ADM-PAC-001` | [API-ADM-PAC-001 — `GET /api/admin/pacientes`](04-api/admin-pacientes/API-ADM-PAC-001-listar.md) | RASCUNHO |  |
+| `API-ADM-PAC-002` | [API-ADM-PAC-002 — `POST /api/admin/pacientes`](04-api/admin-pacientes/API-ADM-PAC-002-criar.md) | RASCUNHO |  |
+| `API-ADM-PAC-003` | [API-ADM-PAC-003 — `PATCH /api/admin/pacientes/:id`](04-api/admin-pacientes/API-ADM-PAC-003-atualizar.md) | RASCUNHO |  |
+| `API-ADM-PAC-004` | [API-ADM-PAC-004 — `POST /api/admin/pacientes/:id/inativar`](04-api/admin-pacientes/API-ADM-PAC-004-arquivar.md) | RASCUNHO |  |
+| `API-PAC-001` | [API-PAC-001 — `GET /api/pacientes`](04-api/pacientes/API-PAC-001-listar-rt.md) | RASCUNHO |  |
+| `API-PAC-002` | [API-PAC-002 — `GET /api/pacientes/:id`](04-api/pacientes/API-PAC-002-detalhe.md) | RASCUNHO |  |
+| `API-AGE-001` | [API-AGE-001 — `GET /api/agendamentos`](04-api/agendamentos/API-AGE-001-listar.md) | RASCUNHO |  |
+| `API-AGE-002` | [API-AGE-002 — `POST /api/agendamentos`](04-api/agendamentos/API-AGE-002-criar.md) | RASCUNHO |  |
+| `API-AGE-003` | [API-AGE-003 — `PATCH /api/agendamentos/:id`](04-api/agendamentos/API-AGE-003-atualizar.md) | RASCUNHO |  |
+| `API-AGE-004` | [API-AGE-004 — `POST /api/agendamentos/:id/cancelar`](04-api/agendamentos/API-AGE-004-cancelar.md) | RASCUNHO |  |
+| `API-AGE-005` | [API-AGE-005 — `POST /api/agendamentos/:id/concluir`](04-api/agendamentos/API-AGE-005-concluir.md) | RASCUNHO |  |
+| `API-MED-001` | [API-MED-001 — `GET /api/pacientes/:pacienteId/prescricoes`](04-api/medicamentos/API-MED-001-listar-prescricoes.md) | RASCUNHO |  |
+| `API-MED-002` | [API-MED-002 — `POST /api/pacientes/:pacienteId/prescricoes`](04-api/medicamentos/API-MED-002-criar-prescricao.md) | RASCUNHO |  |
+| `API-MED-003` | [API-MED-003 — `PATCH /api/prescricoes/:id`](04-api/medicamentos/API-MED-003-atualizar-prescricao.md) | RASCUNHO |  |
+| `API-MED-004` | [API-MED-004 — `POST /api/prescricoes/:id/encerrar`](04-api/medicamentos/API-MED-004-inativar-prescricao.md) | RASCUNHO |  |
+| `API-MED-005` | [API-MED-005 — `POST /api/prescricoes/:id/administracoes`](04-api/medicamentos/API-MED-005-registrar-administracao.md) | RASCUNHO |  |
+| `API-MED-006` | [API-MED-006 — `GET /api/pacientes/:pacienteId/administracoes`](04-api/medicamentos/API-MED-006-listar-administracoes.md) | RASCUNHO |  |
+| `API-MED-007` | [API-MED-007 — `GET /api/medicamentos/alertas`](04-api/medicamentos/API-MED-007-alertas.md) | RASCUNHO |  |
+| `RT-003` | [Canais de Realtime — pacientes](05-realtime/canais-pacientes.md) | RASCUNHO |  |
+| `FE-003` | [Páginas — pacientes](06-frontend/paginas-pacientes.md) | RASCUNHO |  |
+| `FE-004` | [Componentes-chave — pacientes](06-frontend/componentes-pacientes.md) | RASCUNHO |  |
+| `TST-005` | [Testes — pacientes](07-testes/pacientes.md) | RASCUNHO |  |

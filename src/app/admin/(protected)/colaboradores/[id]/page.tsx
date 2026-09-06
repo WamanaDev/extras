@@ -1,7 +1,7 @@
 'use client';
 
 import { use, useState } from 'react';
-import { useListaApi } from '@/lib/api/use-recurso';
+import { useListaApi, useRecursoApi } from '@/lib/api/use-recurso';
 import { EstadoCarregando, EstadoErro, EstadoVazio } from '@/components/admin/Estado';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -39,6 +39,13 @@ export default function ColaboradorDetalhePage({ params }: { params: Promise<{ i
   const [impactoDados, setImpactoDados] = useState<string[] | null>(null);
   const [salvandoDados, setSalvandoDados] = useState(false);
 
+  const rts = useRecursoApi<{ itens: { id: string; nome: string }[] }>('/api/admin/rts');
+  const [rtId, setRtId] = useState<string | null>(null);
+  const [erroReferencia, setErroReferencia] = useState<ErroApi | null>(null);
+  const [impactoReferencia, setImpactoReferencia] = useState<string[] | null>(null);
+  const [salvandoReferencia, setSalvandoReferencia] = useState(false);
+  const [sucessoReferencia, setSucessoReferencia] = useState(false);
+
   const [motivoReset, setMotivoReset] = useState('');
   const [enviandoReset, setEnviandoReset] = useState(false);
   const [resultadoReset, setResultadoReset] = useState<string | null>(null);
@@ -69,6 +76,29 @@ export default function ColaboradorDetalhePage({ params }: { params: Promise<{ i
       return;
     }
     setErroDados(resultado.erro);
+  }
+
+  async function salvarReferencia(confirmarImpacto: boolean): Promise<void> {
+    if (!colaborador) return;
+    if (rtId === null || rtId === colaborador.rt.id) return;
+    const corpo: Record<string, unknown> = { confirmarImpacto, rtId };
+
+    setSalvandoReferencia(true);
+    setErroReferencia(null);
+    setSucessoReferencia(false);
+    const resultado = await patch<{ impacto?: unknown }>(`/api/admin/colaboradores/${id}`, corpo);
+    setSalvandoReferencia(false);
+    if (resultado.ok) {
+      setImpactoReferencia(null);
+      setSucessoReferencia(true);
+      colaboradores.recarregar();
+      return;
+    }
+    if (resultado.erro.erro === 'IMPACTO_NAO_CONFIRMADO') {
+      setImpactoReferencia([resultado.erro.mensagem]);
+      return;
+    }
+    setErroReferencia(resultado.erro);
   }
 
   async function resetarPin(): Promise<void> {
@@ -157,6 +187,51 @@ export default function ColaboradorDetalhePage({ params }: { params: Promise<{ i
       <section className="rounded-lg border border-slate-200 bg-white p-4">
         <h2 className="mb-3 text-sm font-semibold text-slate-900">Trocar escala</h2>
         <EditorEscalaColaborador colaboradorId={id} />
+      </section>
+
+      <section className="rounded-lg border border-slate-200 bg-white p-4">
+        <h2 className="mb-1 text-sm font-semibold text-slate-900">Referência (RT)</h2>
+        <p className="mb-3 text-sm text-slate-500">
+          Vale a partir de agora — não altera dias já gerados na escala. Pra mudar turno/horário (diurno ou noturno), use
+          &quot;Trocar escala&quot; acima.
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="flex flex-col text-sm">
+            RT
+            <select
+              defaultValue={colaborador.rt.id}
+              onChange={(evento) => setRtId(evento.target.value)}
+              className="rounded border border-slate-300 p-1"
+            >
+              {(rts.dados?.itens ?? [colaborador.rt]).map((rt) => (
+                <option key={rt.id} value={rt.id}>
+                  {rt.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <Button onClick={() => void salvarReferencia(false)} disabled={salvandoReferencia}>
+            {salvandoReferencia ? 'Salvando…' : 'Salvar'}
+          </Button>
+        </div>
+        {erroReferencia ? (
+          <p role="alert" className="mt-2 text-sm text-red-800">
+            {erroReferencia.mensagem}
+          </p>
+        ) : null}
+        {sucessoReferencia ? (
+          <p role="status" className="mt-2 text-sm text-emerald-800">
+            Alteração salva.
+          </p>
+        ) : null}
+        <ConfirmacaoImpacto
+          aberto={impactoReferencia !== null}
+          itens={impactoReferencia ?? []}
+          carregando={salvandoReferencia}
+          onCancelar={() => setImpactoReferencia(null)}
+          onConfirmar={() => void salvarReferencia(true)}
+        />
       </section>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">

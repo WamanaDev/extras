@@ -52,3 +52,17 @@ export function formatarDataCivil(data: Date): string {
   const dia = String(data.getUTCDate()).padStart(2, '0');
   return `${ano}-${mes}-${dia}`;
 }
+
+/** America/Sao_Paulo não observa horário de verão desde 2019: offset fixo UTC-3 (mesma constante de `src/lib/escala/blocos.ts`). */
+const OFFSET_SAO_PAULO_HORAS = -3;
+
+/**
+ * Data civil "hoje" em America/Sao_Paulo a partir de um instante UTC
+ * (`ctx.agora`) — nunca `agora.getUTC*()` direto: perto da meia-noite UTC
+ * isso já é o dia seguinte em Brasília, fazendo uma vigência "hoje" válida
+ * parecer retroativa.
+ */
+export function hojeCivilSaoPaulo(agora: Date): Date {
+  const instanteSaoPaulo = new Date(agora.getTime() + OFFSET_SAO_PAULO_HORAS * 60 * 60 * 1000);
+  return new Date(Date.UTC(instanteSaoPaulo.getUTCFullYear(), instanteSaoPaulo.getUTCMonth(), instanteSaoPaulo.getUTCDate()));
+}

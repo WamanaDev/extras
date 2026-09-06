@@ -39,3 +39,12 @@ PRs e ao referenciar specs entre si. IDs não são reciclados.
 
 Cada spec tem um campo `Status` no cabeçalho: `RASCUNHO`, `PRONTA`, `EM_IMPLEMENTACAO`,
 `IMPLEMENTADA`, `OBSOLETA`. Sub-agente só pega spec `PRONTA`.
+
+## Módulo de pacientes (RASCUNHO)
+
+Bloco final de `INDICE.md` (`FUND-005` em diante): cuidado com paciente por RT — cadastro pelo
+admin, agendamento (consulta/saída) e medicação (prescrição + administração) pelo colaborador da
+mesma RT do paciente. Depende do módulo de escala já `PRONTA` só por reuso de `rt` e
+`colaborador`; não altera nenhuma tabela, função ou policy existente. Antes de promover qualquer
+spec do módulo para `PRONTA`, revisar RN vs. `RNP-*` em conjunto — são catálogos separados de
+propósito (`01-dominio/regras-negocio-pacientes.md`).
