@@ -69,6 +69,17 @@ const serverSchema = z.object({
   // placeholder, nunca a chave real).
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().optional(),
+  // Autentica as rotas `/api/cron/*` (lembrete de extra — pedido do
+  // usuário, ver `src/server/notificacoes/lembrete-extra.ts`): a rota
+  // recusa qualquer chamada cujo header `Authorization` não seja `Bearer
+  // <CRON_SECRET>`, senão qualquer um na internet poderia disparar
+  // notificações em massa. Vercel Cron Jobs envia esse header sozinho
+  // quando `CRON_SECRET` está configurada no projeto (não precisa colocar
+  // no `vercel.json`). Opcional aqui (como VAPID acima) — sem ela, a rota
+  // de cron simplesmente recusa tudo (nenhum push é enviado, não é erro de
+  // boot); gerar com `openssl rand -hex 32` antes de habilitar os crons de
+  // verdade.
+  CRON_SECRET: z.string().optional(),
 });
 
 const clientSchema = z.object({

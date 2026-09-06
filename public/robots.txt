@@ -1,0 +1,3 @@
+# Extrinha é um sistema interno (login obrigatório) — não indexar.
+User-agent: *
+Disallow: /

@@ -8,12 +8,33 @@
  * `status = 'PUBLICADO'` e recebendo `TRANSICAO_INVALIDA` — é exatamente
  * o que F5-6 cobre de forma determinística.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import type { AtorAdmin, ContextoRequisicao } from '@/server/http/handler';
 
+// `publicar.ts` agora chama `criarNotificacao` (pedido do usuário — avisa
+// colaboradores ativos ao publicar), que importa `push.ts`, que valida
+// `src/env.ts` no import do módulo — mesmo motivo de `handler.test.ts`.
+beforeAll(() => {
+  process.env.DATABASE_URL ??= 'postgresql://postgres:postgres@localhost:6543/extras?pgbouncer=true';
+  process.env.DIRECT_URL ??= 'postgresql://postgres:postgres@localhost:5432/extras';
+  process.env.SUPABASE_SERVICE_ROLE_KEY ??= 'teste';
+  process.env.SESSION_SECRET ??= 'a'.repeat(32);
+  process.env.PIN_PEPPER ??= 'pepper-pin-teste';
+  process.env.UPSTASH_REDIS_REST_URL ??= 'https://exemplo.upstash.io';
+  process.env.UPSTASH_REDIS_REST_TOKEN ??= 'teste';
+  process.env.TZ ??= 'America/Sao_Paulo';
+  process.env.NEXT_PUBLIC_SUPABASE_URL ??= 'https://exemplo.supabase.co';
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??= 'teste';
+});
+
 vi.mock('@/server/audit/registrar', () => ({
   registrarAuditoria: vi.fn().mockResolvedValue({ id: 'audit-1', hash: 'hash-1' }),
+}));
+
+const criarNotificacaoMock = vi.fn().mockResolvedValue({ id: 'notif-1' });
+vi.mock('@/server/notificacoes/criar', () => ({
+  criarNotificacao: (...args: unknown[]) => criarNotificacaoMock(...args),
 }));
 
 const CTX: ContextoRequisicao = {
@@ -38,6 +59,7 @@ function criarPrismaFake(opts: {
   cobertura?: Array<{ deficit: number }>;
   semEscala?: number;
   cicloAtualizado?: Record<string, unknown>;
+  colaboradoresAtivos?: Array<{ id: string }>;
 }): PrismaClient {
   const queryRaw = vi.fn();
   queryRaw.mockResolvedValueOnce(opts.cicloRow ? [opts.cicloRow] : []); // buscarCicloParaPublicar (FOR UPDATE)
@@ -46,15 +68,20 @@ function criarPrismaFake(opts: {
     $queryRaw: queryRaw,
     plantao: { count: vi.fn().mockResolvedValue(opts.totalPlantoes) },
     colaborador: { count: vi.fn().mockResolvedValue(opts.semEscala ?? 0) },
-    ciclo: { update: vi.fn().mockResolvedValue(opts.cicloAtualizado ?? { id: 'ciclo-1', status: 'PUBLICADO' }) },
+    ciclo: { update: vi.fn().mockResolvedValue(opts.cicloAtualizado ?? { id: 'ciclo-1', status: 'PUBLICADO', ano: 2026, mes: 9 }) },
   };
   return {
     $transaction: vi.fn((callback: (tx: unknown) => unknown) => callback(tx)),
+    // Fora da transação — notificação aos colaboradores ativos, só depois do commit (ver `publicar.ts`).
+    colaborador: { findMany: vi.fn().mockResolvedValue(opts.colaboradoresAtivos ?? []) },
   } as unknown as PrismaClient;
 }
 
 describe('publicarCiclo (F5-1..F5-6)', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    criarNotificacaoMock.mockClear();
+  });
 
   it('publicação válida (escala gerada, plantões, sem avisos) vira PUBLICADO', async () => {
     const { publicarCiclo } = await import('./publicar');
@@ -69,6 +96,54 @@ describe('publicarCiclo (F5-1..F5-6)', () => {
       expect.anything(),
       expect.objectContaining({ acao: 'CICLO_PUBLICADO', entidadeId: 'ciclo-1' }),
     );
+  });
+
+  it('publicação bem-sucedida notifica TODOS os colaboradores ativos (pedido do usuário), com a competência certa no texto', async () => {
+    const { publicarCiclo } = await import('./publicar');
+    const prisma = criarPrismaFake({
+      cicloRow: CICLO_ROW_BASE,
+      totalPlantoes: 5,
+      cobertura: [{ deficit: 0 }],
+      cicloAtualizado: { id: 'ciclo-1', status: 'PUBLICADO', ano: 2026, mes: 9 },
+      colaboradoresAtivos: [{ id: 'colab-1' }, { id: 'colab-2' }],
+    });
+
+    await publicarCiclo(prisma, 'ciclo-1', {}, ADMIN, CTX);
+
+    expect(criarNotificacaoMock).toHaveBeenCalledTimes(2);
+    expect(criarNotificacaoMock).toHaveBeenCalledWith(prisma, {
+      colaboradorId: 'colab-1',
+      tipo: 'CICLO_PUBLICADO',
+      titulo: 'Escala publicada',
+      mensagem: 'A escala de Setembro/2026 foi publicada.',
+      link: '/minha-escala',
+    });
+    expect(criarNotificacaoMock).toHaveBeenCalledWith(prisma, expect.objectContaining({ colaboradorId: 'colab-2' }));
+  });
+
+  it('falha ao notificar não desfaz nem falha a publicação já commitada (best-effort)', async () => {
+    const { publicarCiclo } = await import('./publicar');
+    criarNotificacaoMock.mockRejectedValueOnce(new Error('falha ao gravar notificação'));
+    const prisma = criarPrismaFake({
+      cicloRow: CICLO_ROW_BASE,
+      totalPlantoes: 5,
+      cobertura: [{ deficit: 0 }],
+      colaboradoresAtivos: [{ id: 'colab-1' }],
+    });
+
+    const resultado = await publicarCiclo(prisma, 'ciclo-1', {}, ADMIN, CTX);
+
+    expect(resultado.ciclo.status).toBe('PUBLICADO');
+  });
+
+  it('nenhum colaborador ativo → não chama criarNotificacao, publicação segue normal', async () => {
+    const { publicarCiclo } = await import('./publicar');
+    const prisma = criarPrismaFake({ cicloRow: CICLO_ROW_BASE, totalPlantoes: 5, cobertura: [{ deficit: 0 }], colaboradoresAtivos: [] });
+
+    const resultado = await publicarCiclo(prisma, 'ciclo-1', {}, ADMIN, CTX);
+
+    expect(resultado.ciclo.status).toBe('PUBLICADO');
+    expect(criarNotificacaoMock).not.toHaveBeenCalled();
   });
 
   it('sem escala gerada devolve ESCALA_NAO_GERADA', async () => {

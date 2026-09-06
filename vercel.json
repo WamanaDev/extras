@@ -1,0 +1,6 @@
+{
+  "crons": [
+    { "path": "/api/cron/lembrete-extra?turno=NOTURNO", "schedule": "0 11 * * *" },
+    { "path": "/api/cron/lembrete-extra?turno=DIURNO", "schedule": "0 23 * * *" }
+  ]
+}

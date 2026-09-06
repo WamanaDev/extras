@@ -1,11 +1,44 @@
 import { headers } from "next/headers";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Escala 12x36",
-  description: "Sistema de escala 12x36 e horas extras",
+  title: {
+    default: "Extrinha — Escala 12x36",
+    template: "%s · Extrinha",
+  },
+  description: "Sistema de escala 12x36 e distribuição de plantões extras",
+  applicationName: "Extrinha",
+  robots: { index: false, follow: false },
+  manifest: "/site.webmanifest",
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+    other: [{ rel: "mask-icon", url: "/safari-pinned-tab.svg", color: "#0B4F4A" }],
+  },
+  openGraph: {
+    title: "Extrinha — Escala 12x36",
+    description: "Sistema de escala 12x36 e distribuição de plantões extras",
+    siteName: "Extrinha",
+    locale: "pt_BR",
+    type: "website",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Extrinha" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Extrinha — Escala 12x36",
+    description: "Sistema de escala 12x36 e distribuição de plantões extras",
+    images: ["/twitter-image.png"],
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#FF6B4D",
 };
 
 /**

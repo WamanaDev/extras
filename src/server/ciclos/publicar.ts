@@ -10,8 +10,15 @@ import type { PrismaClient } from '@prisma/client';
 import { emTransacao, type ClienteTransacao } from '@/server/db/tx';
 import { erroNaoEncontrado } from '@/server/http/erros';
 import { registrarAuditoria } from '@/server/audit/registrar';
+import { criarNotificacao } from '@/server/notificacoes/criar';
+import { redigirParaLog } from '@/server/log/redact';
 import type { AtorAdmin, ContextoRequisicao } from '@/server/http/handler';
 import { erroCiclo } from './compartilhado';
+
+const NOMES_MES = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+];
 
 export const PublicarCicloBodySchema = z.object({
   ignorarAvisos: z.boolean().optional(),
@@ -56,7 +63,9 @@ export async function publicarCiclo(
   ator: AtorAdmin,
   ctx: ContextoRequisicao,
 ): Promise<ResultadoPublicarCiclo> {
-  return emTransacao(prisma, async (tx) => {
+  let competencia = '';
+
+  const resultado = await emTransacao(prisma, async (tx) => {
     const ciclo = await buscarCicloParaPublicar(tx, cicloId);
 
     if (ciclo.status !== 'RASCUNHO') {
@@ -107,6 +116,7 @@ export async function publicarCiclo(
     }
 
     const atualizado = await tx.ciclo.update({ where: { id: cicloId }, data: { status: 'PUBLICADO' } });
+    competencia = `${NOMES_MES[atualizado.mes - 1]}/${atualizado.ano}`;
 
     await registrarAuditoria(tx, {
       atorTipo: 'ADMIN',
@@ -122,4 +132,32 @@ export async function publicarCiclo(
 
     return { ciclo: { id: atualizado.id, status: atualizado.status }, avisos };
   });
+
+  // Notificação a todos os colaboradores ATIVOS (pedido do usuário) só
+  // DEPOIS do commit — mesmo padrão de `broadcastEscalaAtualizada`
+  // (`escala/lote/route.ts`): nunca desfaz a publicação se o envio falhar. O
+  // try/catch é essencial aqui (diferente de `criarNotificacao`/
+  // `enviarPushParaColaborador`, que só protegem o *push*): sem ele, uma
+  // falha ao GRAVAR uma notificação (`notificacao.create`) faria a chamada
+  // inteira rejeitar DEPOIS que o ciclo já foi publicado de verdade — o
+  // admin veria um erro na tela pra uma publicação que na verdade deu certo.
+  try {
+    const colaboradoresAtivos = await prisma.colaborador.findMany({ where: { ativo: true }, select: { id: true } });
+    await Promise.all(
+      colaboradoresAtivos.map((colaborador) =>
+        criarNotificacao(prisma, {
+          colaboradorId: colaborador.id,
+          tipo: 'CICLO_PUBLICADO',
+          titulo: 'Escala publicada',
+          mensagem: `A escala de ${competencia} foi publicada.`,
+          link: '/minha-escala',
+        }),
+      ),
+    );
+  } catch (erro) {
+    // eslint-disable-next-line no-console
+    console.error(redigirParaLog({ msg: 'falha ao notificar colaboradores da publicação do ciclo', cicloId, erro: String(erro) }));
+  }
+
+  return resultado;
 }
