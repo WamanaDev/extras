@@ -80,6 +80,21 @@ const serverSchema = z.object({
   // boot); gerar com `openssl rand -hex 32` antes de habilitar os crons de
   // verdade.
   CRON_SECRET: z.string().optional(),
+  // Google Calendar (OAuth) — pedido do usuário: botão pro colaborador
+  // conectar a agenda pessoal e sincronizar escala + extras confirmadas.
+  // `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` vêm do Google Cloud Console
+  // (tela de credenciais OAuth); ver `src/server/integracoes/google-calendar.ts`.
+  // `CALENDAR_TOKEN_KEY` cifra o refresh token antes de gravar no banco
+  // (AES-256-GCM — 32 bytes em hex, gerar com `openssl rand -hex 32`).
+  // Opcionais de propósito, mesmo padrão de VAPID/CRON_SECRET acima: sem as
+  // três, a integração fica desabilitada (botão unimplemented/oculto), nunca
+  // quebra o boot.
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  CALENDAR_TOKEN_KEY: z
+    .string()
+    .regex(/^[0-9a-fA-F]{64}$/, 'CALENDAR_TOKEN_KEY deve ter 64 caracteres hexadecimais (32 bytes) — gerar com `openssl rand -hex 32`.')
+    .optional(),
 });
 
 const clientSchema = z.object({

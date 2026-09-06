@@ -24,6 +24,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Logo } from '@/components/brand/Logo';
 import { obterSupabaseBrowser } from '@/lib/supabase/browser-client';
 
 type Estado = 'VERIFICANDO' | 'PRONTO' | 'LINK_INVALIDO' | 'SALVANDO' | 'SALVO';
@@ -129,6 +130,7 @@ export default function DefinirSenhaPage(): JSX.Element {
   if (estado === 'LINK_INVALIDO') {
     return (
       <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center p-6">
+        <Logo size={40} className="mb-4" />
         <h1 className="mb-2 text-xl font-semibold text-slate-900">Link inválido ou expirado</h1>
         <p className="text-sm text-slate-600">
           O link de convite expirou ou já foi usado. Peça a outro administrador (ou rode novamente o bootstrap) para
@@ -141,6 +143,7 @@ export default function DefinirSenhaPage(): JSX.Element {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center p-6">
+      <Logo size={40} className="mb-4" />
       <h1 className="mb-6 text-xl font-semibold text-slate-900">Defina sua senha</h1>
       <form
         className="space-y-4"

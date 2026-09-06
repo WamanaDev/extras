@@ -200,7 +200,7 @@ export function GradePlantoes({ cicloId, dadosIniciais, onMudouSaldo, revalidarC
           <select
             value={filtroRt}
             onChange={(e) => setFiltroRt(e.target.value)}
-            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
+            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             <option value="TODAS">Todas</option>
             {rts.map((rt) => (
@@ -216,7 +216,7 @@ export function GradePlantoes({ cicloId, dadosIniciais, onMudouSaldo, revalidarC
           <select
             value={filtroTurno}
             onChange={(e) => setFiltroTurno(e.target.value as 'TODOS' | 'DIURNO' | 'NOTURNO')}
-            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
+            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             <option value="TODOS">Todos</option>
             <option value="DIURNO">Diurno</option>

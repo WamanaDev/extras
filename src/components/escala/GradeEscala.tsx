@@ -564,7 +564,7 @@ function Subgrade({
                             onChange={(evento) =>
                               void aplicarAlteracao(celula.escalaDiaId, colaborador.id, dia, evento.target.value, false)
                             }
-                            className="h-8 w-full appearance-none border-0 bg-transparent text-center text-xs font-semibold focus:outline focus:outline-2 focus:outline-slate-900"
+                            className="h-8 w-full appearance-none border-0 bg-transparent text-center text-xs font-semibold focus:outline focus:outline-2 focus:outline-brand-500"
                             style={{ color: codigoMeta?.cor }}
                           >
                             {codigos.map((codigo) => (

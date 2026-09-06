@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Logo } from '@/components/brand/Logo';
 import { obterSupabaseBrowser } from '@/lib/supabase/browser-client';
 
 const ITENS_NAV = [
@@ -38,8 +39,12 @@ export function AdminNav({ admin }: AdminNavProps): JSX.Element {
 
   return (
     <header className="border-b border-slate-200 bg-white print:hidden">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 p-4">
-        <nav aria-label="Navegação administrativa" className="flex flex-wrap gap-1">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4 p-4">
+        <Link href="/admin" aria-label="Ir para o painel administrativo" className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+          <Logo size={28} />
+        </Link>
+        <span className="hidden h-6 w-px shrink-0 bg-slate-200 md:block" aria-hidden="true" />
+        <nav aria-label="Navegação administrativa" className="flex flex-1 flex-wrap gap-1">
           {ITENS_NAV.map((item) => {
             const ativo = item.href === '/admin' ? pathname === '/admin' : pathname?.startsWith(item.href);
             return (
@@ -48,8 +53,8 @@ export function AdminNav({ admin }: AdminNavProps): JSX.Element {
                 href={item.href}
                 aria-current={ativo ? 'page' : undefined}
                 className={cn(
-                  'rounded-md px-3 py-1.5 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-900',
-                  ativo ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100',
+                  'rounded-md px-3 py-1.5 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500',
+                  ativo ? 'bg-petrol-600 text-white' : 'text-slate-700 hover:bg-slate-100',
                 )}
               >
                 {item.rotulo}

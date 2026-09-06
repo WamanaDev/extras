@@ -16,6 +16,7 @@ import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { post } from '@/lib/api/client';
 import { Button } from '@/components/ui/button';
+import { Logo } from '@/components/brand/Logo';
 
 interface RespostaLoginRapido {
   colaborador: { id: string; nome: string; matricula: string; rt: { codigo: string; nome: string } };
@@ -58,6 +59,7 @@ export default function LoginPage(): JSX.Element {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-4">
+      <Logo size={40} className="mb-2" />
       <div>
         <h1 className="text-xl font-semibold text-slate-900">Escala 12x36</h1>
         <p className="mt-1 text-sm text-slate-600">Entre com sua matrícula e PIN.</p>
@@ -76,7 +78,7 @@ export default function LoginPage(): JSX.Element {
             required
             value={matricula}
             onChange={(e) => setMatricula(e.target.value)}
-            className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
+            className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
           />
         </div>
 
@@ -95,7 +97,7 @@ export default function LoginPage(): JSX.Element {
             required
             value={pin}
             onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-            className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
+            className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
           />
         </div>
 
@@ -105,7 +107,7 @@ export default function LoginPage(): JSX.Element {
           </p>
         ) : null}
 
-        <Button type="submit" className="w-full" disabled={enviando || pin.length < 4} aria-busy={enviando}>
+        <Button type="submit" variant="default" className="w-full bg-brand-500 hover:bg-brand-600" disabled={enviando || pin.length < 4} aria-busy={enviando}>
           {enviando ? 'Entrando…' : 'Entrar'}
         </Button>
 
@@ -113,6 +115,16 @@ export default function LoginPage(): JSX.Element {
           Primeiro acesso ou esqueci o PIN
         </a>
       </form>
+
+      <p className="text-center text-xs text-slate-400">
+        <a href="/privacidade" className="underline hover:text-slate-600">
+          Privacidade
+        </a>{' '}
+        ·{' '}
+        <a href="/termos" className="underline hover:text-slate-600">
+          Termos de uso
+        </a>
+      </p>
     </main>
   );
 }

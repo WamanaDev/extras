@@ -187,6 +187,7 @@ model Colaborador {
   participacoes     ParticipacaoCiclo[]
   notificacoes      Notificacao[]
   pushSubscriptions PushSubscription[]
+  googleCalendarConta GoogleCalendarConta?
 
   @@map("colaborador")
 }
@@ -479,4 +480,24 @@ model PushSubscription {
   colaborador Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Cascade)
 
   @@map("push_subscription")
+}
+
+/// Conta Google conectada pelo colaborador (OAuth) pra sincronizar a escala
+/// na agenda pessoal — pedido do usuário. `refreshTokenCifrado` nunca é o
+/// token em claro (AES-256-GCM, `CALENDAR_TOKEN_KEY` — `google-calendar.ts`);
+/// diferente de PIN/senha, aqui precisa ser REVERSÍVEL (a app usa o token de
+/// verdade pra chamar a API do Google), então é cifrado, não hasheado.
+model GoogleCalendarConta {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  colaboradorId       String   @unique @map("colaborador_id") @db.Uuid
+  refreshTokenCifrado String   @map("refresh_token_cifrado")
+  /// Id do calendário Google usado pros eventos (normalmente "primary" — o calendário principal da conta).
+  calendarioId        String   @default("primary") @map("calendario_id")
+  criadoEm            DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
+  /// Tocado a cada sincronização bem-sucedida.
+  atualizadoEm        DateTime @default(now()) @map("atualizado_em") @db.Timestamptz(6)
+
+  colaborador Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Cascade)
+
+  @@map("google_calendar_conta")
 }

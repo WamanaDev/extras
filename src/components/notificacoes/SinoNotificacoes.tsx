@@ -110,7 +110,7 @@ export function SinoNotificacoes(): JSX.Element {
         onClick={() => setAberto((v) => !v)}
         aria-label={`Notificações${naoLidas > 0 ? ` — ${naoLidas} não lida(s)` : ''}`}
         aria-expanded={aberto}
-        className="relative rounded-full p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
+        className="relative rounded-full p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
       >
         <Bell className="h-5 w-5" aria-hidden="true" />
         {naoLidas > 0 ? (

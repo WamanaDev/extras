@@ -34,7 +34,7 @@ export default async function ColaboradorLayout({ children }: { children: ReactN
   const { colaborador } = resultado.dados;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-brand-50/40">
       <NavColaborador nome={colaborador.nome} matricula={colaborador.matricula} rtNome={colaborador.rt.nome} />
       <main className="mx-auto max-w-5xl px-4 pb-24 pt-4 sm:pb-6 sm:pt-6">{children}</main>
     </div>

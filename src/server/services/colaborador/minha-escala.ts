@@ -1,12 +1,6 @@
 /**
  * API-COL-002 — `GET /api/minha-escala?cicloId=`.
  *
- * `ACID`: "uma query com join, não duas chamadas que possam ver estados
- * diferentes" — por isso uma única `$queryRaw` traz `escala_dia` +
- * `codigo_escala` + a extra confirmada do dia (se houver) numa passada só,
- * em vez de duas queries Prisma separadas que poderiam ver commits
- * diferentes entre si.
- *
  * `turno` por dia: `escala_dia` não tem coluna própria (mesma divergência já
  * registrada em `_conflitos.md`, itens 4/5/7 — a tabela real só guarda
  * âncora/período/turno-base no colaborador e desvios em `troca_escala`).
@@ -17,6 +11,17 @@
  * `observacao` de `escala_dia` **nunca** é selecionada (CIA — C: "pode
  * conter dado de saúde", `SEC-STRIDE` I4) — a query abaixo nem lista a
  * coluna, então não há como vazar por engano.
+ *
+ * Extras confirmadas vêm de uma consulta SEPARADA de `escala_dia`, não de um
+ * `LEFT JOIN LATERAL` ancorado nela (achado em uso real, `_conflitos.md`,
+ * mesma causa raiz do item 39 do lado admin): uma extra tipicamente cai
+ * justo no dia de FOLGA do colaborador, dia que pode não ter linha de
+ * `escala_dia` nenhuma — com o join ancorado ali, o dia inteiro (extra
+ * incluída) simplesmente não aparecia no resultado, e `totais.extras` saía
+ * zerado mesmo com uma extra confirmada de verdade. A consulta de extras
+ * roda independente, e o resultado é só CASADO por data com `dias` (pra
+ * exibir inline quando o dia também tem `escala_dia`) — os TOTAIS somam
+ * direto da consulta de extras, nunca de `dias`.
  */
 import type { PrismaClient } from '@prisma/client';
 
@@ -55,13 +60,17 @@ interface LinhaBruta {
   hora_fim: string | null;
   inicio_em: Date;
   fim_em: Date;
-  extra_plantao_id: string | null;
-  extra_rt_nome: string | null;
-  extra_tipo: 'DIURNO' | 'NOTURNO' | null;
-  extra_hora_inicio: string | null;
-  extra_hora_fim: string | null;
-  extra_inicio_em: Date | null;
-  extra_fim_em: Date | null;
+}
+
+interface LinhaExtraBruta {
+  data: Date;
+  plantao_id: string;
+  rt_nome: string;
+  tipo: 'DIURNO' | 'NOTURNO';
+  hora_inicio: string;
+  hora_fim: string;
+  inicio_em: Date;
+  fim_em: Date;
 }
 
 function paraData(data: Date): string {
@@ -94,14 +103,7 @@ export async function buscarMinhaEscala(
       ce.presenca,
       to_char(e.hora_inicio, 'HH24:MI') AS hora_inicio,
       to_char(e.hora_fim, 'HH24:MI') AS hora_fim,
-      e.inicio_em, e.fim_em,
-      mk.plantao_id AS extra_plantao_id,
-      mk.rt_nome AS extra_rt_nome,
-      mk.tipo AS extra_tipo,
-      mk.hora_inicio_txt AS extra_hora_inicio,
-      mk.hora_fim_txt AS extra_hora_fim,
-      mk.inicio_em AS extra_inicio_em,
-      mk.fim_em AS extra_fim_em
+      e.inicio_em, e.fim_em
     FROM escala_dia e
     JOIN colaborador col ON col.id = e.colaborador_id
     JOIN codigo_escala ce ON ce.id = e.codigo_escala_id
@@ -110,21 +112,23 @@ export async function buscarMinhaEscala(
        WHERE te.colaborador_id = col.id AND te.vigencia_inicio <= e.data
        ORDER BY te.vigencia_inicio DESC LIMIT 1
     ) t ON true
-    LEFT JOIN LATERAL (
-      SELECT m.id, p.id AS plantao_id, r.nome AS rt_nome, p.tipo,
-             to_char(p.hora_inicio, 'HH24:MI') AS hora_inicio_txt,
-             to_char(p.hora_fim, 'HH24:MI') AS hora_fim_txt,
-             p.inicio_em, p.fim_em
-        FROM marcacao m
-        JOIN plantao p ON p.id = m.plantao_id
-        JOIN rt r ON r.id = p.rt_id
-       WHERE m.colaborador_id = e.colaborador_id AND m.status = 'CONFIRMADA'
-         AND p.ciclo_id = e.ciclo_id AND p.data = e.data
-       LIMIT 1
-    ) mk ON true
     WHERE e.colaborador_id = ${colaboradorId}::uuid AND e.ciclo_id = ${cicloId}::uuid
     ORDER BY e.data
   `;
+
+  // Independente de `escala_dia` — ver docstring do módulo.
+  const extrasBrutas = await prisma.$queryRaw<LinhaExtraBruta[]>`
+    SELECT
+      p.data, p.id AS plantao_id, r.nome AS rt_nome, p.tipo,
+      to_char(p.hora_inicio, 'HH24:MI') AS hora_inicio,
+      to_char(p.hora_fim, 'HH24:MI') AS hora_fim,
+      p.inicio_em, p.fim_em
+    FROM marcacao m
+    JOIN plantao p ON p.id = m.plantao_id
+    JOIN rt r ON r.id = p.rt_id
+    WHERE m.colaborador_id = ${colaboradorId}::uuid AND m.status = 'CONFIRMADA' AND p.ciclo_id = ${cicloId}::uuid
+  `;
+  const extrasPorData = new Map(extrasBrutas.map((e) => [paraData(e.data), e]));
 
   const dias: DiaEscala[] = linhas.map((linha) => {
     const dia: DiaEscala = {
@@ -136,30 +140,26 @@ export async function buscarMinhaEscala(
       horaInicio: linha.hora_inicio,
       horaFim: linha.hora_fim,
     };
-    if (linha.extra_plantao_id) {
+    const extra = extrasPorData.get(paraData(linha.data));
+    if (extra) {
       dia.extra = {
-        plantaoId: linha.extra_plantao_id,
-        rt: linha.extra_rt_nome as string,
-        tipo: linha.extra_tipo as 'DIURNO' | 'NOTURNO',
-        horaInicio: linha.extra_hora_inicio as string,
-        horaFim: linha.extra_hora_fim as string,
+        plantaoId: extra.plantao_id,
+        rt: extra.rt_nome,
+        tipo: extra.tipo,
+        horaInicio: extra.hora_inicio,
+        horaFim: extra.hora_fim,
       };
     }
     return dia;
   });
 
   const escalados = linhas.filter((l) => l.presenca).length;
-  const extras = linhas.filter((l) => l.extra_plantao_id !== null).length;
-  const horasEscaladas = linhas
-    .filter((l) => l.presenca)
-    .reduce((soma, l) => soma + horasEntre(l.inicio_em, l.fim_em), 0);
-  const horasExtras = linhas
-    .filter((l) => l.extra_plantao_id !== null)
-    .reduce((soma, l) => soma + horasEntre(l.extra_inicio_em as Date, l.extra_fim_em as Date), 0);
+  const horasEscaladas = linhas.filter((l) => l.presenca).reduce((soma, l) => soma + horasEntre(l.inicio_em, l.fim_em), 0);
+  const horasExtras = extrasBrutas.reduce((soma, e) => soma + horasEntre(e.inicio_em, e.fim_em), 0);
 
   return {
     ciclo: { ano: ciclo.ano, mes: ciclo.mes },
     dias,
-    totais: { escalados, extras, horas: horasEscaladas + horasExtras },
+    totais: { escalados, extras: extrasBrutas.length, horas: horasEscaladas + horasExtras },
   };
 }

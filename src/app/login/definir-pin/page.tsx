@@ -12,6 +12,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { post } from '@/lib/api/client';
 import { Button } from '@/components/ui/button';
+import { Logo } from '@/components/brand/Logo';
 import { lerTokenParcial, limparTokenParcial, type TokenParcialGuardado } from '../_sessao-parcial';
 
 interface RespostaDefinirPin {
@@ -94,6 +95,7 @@ export default function DefinirPinPage(): JSX.Element {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-4">
+      <Logo size={40} className="mb-2" />
       <div>
         <h1 className="text-xl font-semibold text-slate-900">Defina seu PIN</h1>
         <p className="mt-1 text-sm text-slate-600">
@@ -117,7 +119,7 @@ export default function DefinirPinPage(): JSX.Element {
             required
             value={pin}
             onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-            className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
+            className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
           />
         </div>
 
@@ -136,7 +138,7 @@ export default function DefinirPinPage(): JSX.Element {
             required
             value={confirmacao}
             onChange={(e) => setConfirmacao(e.target.value.replace(/\D/g, ''))}
-            className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
+            className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
           />
         </div>
 

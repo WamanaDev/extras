@@ -6,8 +6,10 @@
  * também não tenta adivinhar/derivar isso, só mostra o `codigo`/`descricaoCodigo`
  * que a API já filtrou.
  */
+import { Suspense } from 'react';
 import { getServidor } from '@/lib/api/servidor';
 import { Badge } from '@/components/ui/badge';
+import { GoogleCalendarBotao } from '@/components/colaborador/GoogleCalendarBotao';
 
 interface CicloAtual {
   id: string;
@@ -195,6 +197,10 @@ export default async function MinhaEscalaPage(): Promise<JSX.Element> {
           </div>
         </>
       )}
+
+      <Suspense fallback={null}>
+        <GoogleCalendarBotao cicloId={ciclo.id} />
+      </Suspense>
 
       <section>
         <h2 className="text-base font-semibold text-slate-900">Minhas extras confirmadas</h2>

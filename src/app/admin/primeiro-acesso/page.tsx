@@ -17,6 +17,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Logo } from '@/components/brand/Logo';
 import { obterSupabaseBrowser } from '@/lib/supabase/browser-client';
 
 export default function PrimeiroAcessoPage(): JSX.Element {
@@ -41,6 +42,7 @@ export default function PrimeiroAcessoPage(): JSX.Element {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center p-6">
+      <Logo size={40} className="mb-4" />
       <h1 className="mb-2 text-xl font-semibold text-slate-900">Primeiro acesso</h1>
       <p className="mb-6 text-sm text-slate-600">
         Entre com o e-mail e a senha temporária que você recebeu para definir sua senha definitiva e cadastrar o

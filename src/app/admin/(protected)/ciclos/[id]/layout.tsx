@@ -53,7 +53,7 @@ export default function CicloLayout({
               href={href}
               className={cn(
                 'border-b-2 px-3 py-2 -mb-px',
-                ativo ? 'border-slate-900 font-medium text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-900',
+                ativo ? 'border-petrol-600 font-medium text-petrol-700' : 'border-transparent text-slate-500 hover:text-slate-900',
               )}
             >
               {aba.label}

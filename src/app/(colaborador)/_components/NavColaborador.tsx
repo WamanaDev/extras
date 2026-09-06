@@ -8,6 +8,7 @@ import { LayoutDashboard, CalendarDays, CalendarRange, ListChecks, LogOut } from
 import { post } from '@/lib/api/client';
 import { Button } from '@/components/ui/button';
 import { SinoNotificacoes } from '@/components/notificacoes/SinoNotificacoes';
+import { Logo } from '@/components/brand/Logo';
 import { cn } from '@/lib/utils';
 
 /**
@@ -56,7 +57,12 @@ export function NavColaborador({
       <header className="border-b border-slate-200 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-slate-900 to-slate-700 text-xs font-semibold text-white">
+            <Link href="/painel" aria-label="Ir para o painel" className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+              <Logo size={30} withText className="hidden sm:inline-flex" />
+              <Logo size={30} withText={false} className="sm:hidden" />
+            </Link>
+            <span className="hidden h-6 w-px shrink-0 bg-slate-200 sm:block" aria-hidden="true" />
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-petrol-800 to-petrol-600 text-xs font-semibold text-white">
               {iniciais(nome)}
             </span>
             <div className="min-w-0">
@@ -85,8 +91,8 @@ export function NavColaborador({
                 href={href}
                 aria-current={ativo ? 'page' : undefined}
                 className={cn(
-                  'flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900',
-                  ativo ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+                  'flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
+                  ativo ? 'bg-petrol-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
                 )}
               >
                 <Icone className="h-4 w-4" aria-hidden="true" />
@@ -110,11 +116,11 @@ export function NavColaborador({
               href={href}
               aria-current={ativo ? 'page' : undefined}
               className={cn(
-                'flex flex-1 flex-col items-center gap-0.5 px-1 py-2 text-center text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900',
-                ativo ? 'text-slate-900' : 'text-slate-400',
+                'flex flex-1 flex-col items-center gap-0.5 px-1 py-2 text-center text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
+                ativo ? 'text-petrol-700' : 'text-slate-400',
               )}
             >
-              <Icone className={cn('h-5 w-5', ativo && 'text-slate-900')} aria-hidden="true" />
+              <Icone className={cn('h-5 w-5', ativo && 'text-petrol-700')} aria-hidden="true" />
               {rotulo}
             </Link>
           );

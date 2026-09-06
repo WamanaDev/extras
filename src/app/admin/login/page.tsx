@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { post, type ErroApi } from '@/lib/api/client';
 import { Button } from '@/components/ui/button';
+import { Logo } from '@/components/brand/Logo';
 import { obterSupabaseBrowser } from '@/lib/supabase/browser-client';
 
 /**
@@ -95,6 +96,7 @@ export default function AdminLoginPage(): JSX.Element {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center p-6">
+      <Logo size={40} className="mb-4" />
       <h1 className="mb-6 text-xl font-semibold text-slate-900">Acesso administrativo</h1>
 
       {etapa === 'CREDENCIAIS' ? (
@@ -177,6 +179,16 @@ export default function AdminLoginPage(): JSX.Element {
           </Button>
         </form>
       )}
+
+      <p className="mt-6 text-center text-xs text-slate-400">
+        <a href="/privacidade" className="underline hover:text-slate-600">
+          Privacidade
+        </a>{' '}
+        ·{' '}
+        <a href="/termos" className="underline hover:text-slate-600">
+          Termos de uso
+        </a>
+      </p>
     </main>
   );
 }

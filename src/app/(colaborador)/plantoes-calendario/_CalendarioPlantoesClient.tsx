@@ -213,7 +213,7 @@ export function CalendarioPlantoesClient({
                 disabled={atualizandoManual}
                 aria-busy={atualizandoManual}
                 title="Atualizar agora"
-                className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 disabled:opacity-50"
+                className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50"
               >
                 <RefreshCw className={cn('h-4 w-4', atualizandoManual && 'animate-spin')} aria-hidden="true" />
               </button>
@@ -247,9 +247,9 @@ export function CalendarioPlantoesClient({
                   type="button"
                   onClick={() => setDiaSelecionado(celula.data)}
                   className={cn(
-                    'flex aspect-square flex-col items-center justify-center gap-0.5 rounded-lg border text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900',
+                    'flex aspect-square flex-col items-center justify-center gap-0.5 rounded-lg border text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
                     ativo
-                      ? 'border-slate-900 bg-slate-900 text-white'
+                      ? 'border-petrol-600 bg-petrol-600 text-white'
                       : plantoesNoDia.length > 0
                         ? 'border-emerald-200 bg-emerald-50 text-slate-900 hover:border-slate-400'
                         : 'border-slate-100 text-slate-400 hover:border-slate-300',

@@ -13,6 +13,7 @@
  */
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Logo } from '@/components/brand/Logo';
 import { obterSupabaseBrowser } from '@/lib/supabase/browser-client';
 
 export default function RecuperarSenhaPage(): JSX.Element {
@@ -42,6 +43,7 @@ export default function RecuperarSenhaPage(): JSX.Element {
   if (enviado) {
     return (
       <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center p-6">
+        <Logo size={40} className="mb-4" />
         <h1 className="mb-2 text-xl font-semibold text-slate-900">Verifique seu e-mail</h1>
         <p className="text-sm text-slate-600">
           Se <strong>{email}</strong> tiver uma conta de administrador, enviamos um link para redefinir a senha. O
@@ -53,6 +55,7 @@ export default function RecuperarSenhaPage(): JSX.Element {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center p-6">
+      <Logo size={40} className="mb-4" />
       <h1 className="mb-2 text-xl font-semibold text-slate-900">Recuperar senha</h1>
       <p className="mb-6 text-sm text-slate-600">Informe seu e-mail de administrador para receber um link de redefinição.</p>
       <form

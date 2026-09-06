@@ -12,7 +12,9 @@
  * de ausência) nunca é exposto pela API, e esta página também não tenta
  * adivinhar isso.
  */
+import { Suspense } from 'react';
 import { getServidor } from '@/lib/api/servidor';
+import { GoogleCalendarBotao } from '@/components/colaborador/GoogleCalendarBotao';
 import { CalendarioEscalaClient, type MinhaEscala, type MinhasMarcacoesResposta } from './_CalendarioEscalaClient';
 
 interface CicloAtual {
@@ -64,6 +66,10 @@ export default async function MinhaEscalaCalendarioPage(): Promise<JSX.Element> 
           Minha escala — {String(ciclo.mes).padStart(2, '0')}/{ciclo.ano}
         </h1>
       </section>
+
+      <Suspense fallback={null}>
+        <GoogleCalendarBotao cicloId={ciclo.id} />
+      </Suspense>
 
       <CalendarioEscalaClient
         ano={ciclo.ano}

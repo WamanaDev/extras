@@ -101,17 +101,17 @@ function categoriaDoDia(dia: DiaEscala | undefined, temExtraConfirmada: boolean)
 
 const ESTILO_CELULA: Record<CategoriaDia, { ativo: string; padrao: string; ponto: string }> = {
   TRABALHADO: {
-    ativo: 'border-slate-900 bg-slate-900 text-white',
+    ativo: 'border-petrol-600 bg-petrol-600 text-white',
     padrao: 'border-blue-200 bg-blue-50 text-slate-900 hover:border-slate-400',
     ponto: 'bg-blue-500',
   },
   EXTRA: {
-    ativo: 'border-slate-900 bg-slate-900 text-white',
+    ativo: 'border-petrol-600 bg-petrol-600 text-white',
     padrao: 'border-amber-200 bg-amber-50 text-slate-900 hover:border-slate-400',
     ponto: 'bg-amber-500',
   },
   FOLGA: {
-    ativo: 'border-slate-900 bg-slate-900 text-white',
+    ativo: 'border-petrol-600 bg-petrol-600 text-white',
     padrao: 'border-slate-100 text-slate-400 hover:border-slate-300',
     ponto: 'bg-slate-300',
   },
@@ -203,8 +203,8 @@ export function CalendarioEscalaClient({ ano, mes, escala, marcacoes }: Calendar
                     type="button"
                     onClick={() => setDiaSelecionado(celula.data)}
                     className={cn(
-                      'flex aspect-square flex-col items-center justify-center gap-0.5 rounded-lg border text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900',
-                      ativo ? estilo?.ativo ?? 'border-slate-900 bg-slate-900 text-white' : estilo?.padrao ?? 'border-slate-100 text-slate-400',
+                      'flex aspect-square flex-col items-center justify-center gap-0.5 rounded-lg border text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
+                      ativo ? estilo?.ativo ?? 'border-petrol-600 bg-petrol-600 text-white' : estilo?.padrao ?? 'border-slate-100 text-slate-400',
                     )}
                   >
                     <span className="font-semibold">{celula.dia}</span>

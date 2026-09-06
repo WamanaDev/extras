@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { buscarMinhaEscala, type ClienteMinhaEscala } from './minha-escala';
 
-function clienteFake(ciclo: unknown, linhas: unknown[]): ClienteMinhaEscala {
+function clienteFake(ciclo: unknown, linhas: unknown[], extras: unknown[] = []): ClienteMinhaEscala {
+  const queryRaw = vi.fn();
+  queryRaw.mockResolvedValueOnce(linhas); // consulta de escala_dia
+  queryRaw.mockResolvedValueOnce(extras); // consulta de extras (independente — ver docstring do módulo)
   return {
     ciclo: { findUnique: vi.fn(async () => ciclo) },
-    $queryRaw: vi.fn(async () => linhas),
+    $queryRaw: queryRaw,
   } as unknown as ClienteMinhaEscala;
 }
 
@@ -21,13 +24,20 @@ function linhaBase(overrides: Record<string, unknown> = {}) {
     hora_fim: '19:00',
     inicio_em: new Date('2026-09-04T07:00:00-03:00'),
     fim_em: new Date('2026-09-04T19:00:00-03:00'),
-    extra_plantao_id: null,
-    extra_rt_nome: null,
-    extra_tipo: null,
-    extra_hora_inicio: null,
-    extra_hora_fim: null,
-    extra_inicio_em: null,
-    extra_fim_em: null,
+    ...overrides,
+  };
+}
+
+function extraBase(overrides: Record<string, unknown> = {}) {
+  return {
+    data: new Date('2026-09-04T00:00:00Z'),
+    plantao_id: 'plantao-1',
+    rt_nome: 'RT1',
+    tipo: 'NOTURNO',
+    hora_inicio: '19:00',
+    hora_fim: '07:00',
+    inicio_em: new Date('2026-09-04T19:00:00-03:00'),
+    fim_em: new Date('2026-09-05T07:00:00-03:00'),
     ...overrides,
   };
 }
@@ -46,17 +56,8 @@ describe('buscarMinhaEscala (API-COL-002)', () => {
     expect(resultado.dias[0]).toMatchObject({ codigo: 'F', presenca: false });
   });
 
-  it('#3 dia com extra: campo extra preenchido', async () => {
-    const linha = linhaBase({
-      extra_plantao_id: 'plantao-1',
-      extra_rt_nome: 'RT1',
-      extra_tipo: 'NOTURNO',
-      extra_hora_inicio: '19:00',
-      extra_hora_fim: '07:00',
-      extra_inicio_em: new Date('2026-09-04T19:00:00-03:00'),
-      extra_fim_em: new Date('2026-09-05T07:00:00-03:00'),
-    });
-    const resultado = await buscarMinhaEscala(clienteFake(CICLO, [linha]), 'colab-1', 'ciclo-1');
+  it('#3 extra no mesmo dia de uma linha de escala_dia: campo extra preenchido inline', async () => {
+    const resultado = await buscarMinhaEscala(clienteFake(CICLO, [linhaBase()], [extraBase()]), 'colab-1', 'ciclo-1');
     expect(resultado.dias[0]?.extra).toEqual({
       plantaoId: 'plantao-1',
       rt: 'RT1',
@@ -65,6 +66,15 @@ describe('buscarMinhaEscala (API-COL-002)', () => {
       horaFim: '07:00',
     });
     expect(resultado.totais.extras).toBe(1);
+  });
+
+  it('achado em uso real: extra num dia SEM linha de escala_dia (dia de folga sem registro) ainda conta no total — não fica mais invisível', async () => {
+    // Nenhuma linha de escala_dia (`linhas` vazio) — só a extra, num dia que não aparece em `dias`.
+    const resultado = await buscarMinhaEscala(clienteFake(CICLO, [], [extraBase({ data: new Date('2026-09-10T00:00:00Z') })]), 'colab-1', 'ciclo-1');
+
+    expect(resultado.dias).toEqual([]); // nenhum dia de escala pra mostrar
+    expect(resultado.totais.extras).toBe(1); // mas a extra CONTA
+    expect(resultado.totais.horas).toBe(12); // 19:00–07:00 do dia seguinte
   });
 
   it('#4 observacao nunca aparece no payload (a query não a seleciona)', async () => {

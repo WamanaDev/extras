@@ -15,6 +15,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Logo } from '@/components/brand/Logo';
 import { obterSupabaseBrowser } from '@/lib/supabase/browser-client';
 
 type Estado = 'CARREGANDO' | 'JA_TEM_FATOR' | 'AGUARDANDO_CODIGO' | 'VERIFICANDO' | 'ERRO';
@@ -96,6 +97,7 @@ export default function ConfigurarMfaPage(): JSX.Element {
   if (estado === 'JA_TEM_FATOR') {
     return (
       <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center p-6">
+        <Logo size={40} className="mb-4" />
         <h1 className="mb-2 text-xl font-semibold text-slate-900">MFA já configurado</h1>
         <p className="mb-4 text-sm text-slate-600">Sua conta já tem um autenticador cadastrado.</p>
         <Button className="w-full" onClick={() => router.push('/admin/login')}>
@@ -107,6 +109,7 @@ export default function ConfigurarMfaPage(): JSX.Element {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center p-6">
+      <Logo size={40} className="mb-4" />
       <h1 className="mb-6 text-xl font-semibold text-slate-900">Configure seu autenticador</h1>
       <p className="mb-4 text-sm text-slate-600">
         Escaneie o QR code com um app autenticador (Google Authenticator, Authy, 1Password, etc).
