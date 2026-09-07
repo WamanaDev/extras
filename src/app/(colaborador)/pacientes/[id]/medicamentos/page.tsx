@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { get, post, type ErroApi } from '@/lib/api/client';
+import { useAgendaPacientesRealtime } from '@/hooks/useAgendaPacientesRealtime';
 
 interface Prescricao {
   id: string;
@@ -105,6 +106,11 @@ export default function MedicamentosPage({ params }: { params: Promise<{ id: str
   const administracoes = useRecursoApi<Administracao[]>(`/api/pacientes/${pacienteId}/administracoes`);
   const me = useRecursoApi<RespostaMe>('/api/auth/me');
   const meuId = me.dados?.tipo === 'COLABORADOR' ? me.dados.colaborador?.id ?? null : null;
+  const rtInfo = useRecursoApi<{ rtId: string }>('/api/colaborador/rt');
+  useAgendaPacientesRealtime(rtInfo.dados?.rtId, () => {
+    administracoes.recarregar();
+    prescricoes.recarregar();
+  });
 
   const [novaReceitaAberta, setNovaReceitaAberta] = useState(false);
   const [form, setForm] = useState(FORM_VAZIO);

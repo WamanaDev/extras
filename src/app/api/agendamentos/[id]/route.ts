@@ -6,6 +6,7 @@ import { defineHandler } from '@/server/http/handler';
 import { obterPrisma } from '@/server/db/client';
 import { atualizarAgendamentoNaRt } from '@/server/services/pacientes/agendamentos';
 import { obterRtDoColaborador } from '@/server/services/pacientes/contexto';
+import { broadcastPacientes } from '@/server/realtime/broadcast-pacientes';
 
 const ParamsSchema = z.object({ id: z.string().uuid() });
 
@@ -28,6 +29,10 @@ export const PATCH = defineHandler({
   handler: async ({ params, body, ator, ctx }) => {
     const prisma = await obterPrisma();
     const rtId = await obterRtDoColaborador(prisma, ator.colaboradorId);
-    return atualizarAgendamentoNaRt(prisma, params.id, rtId, body, { tipo: 'COLABORADOR', colaboradorId: ator.colaboradorId }, ctx);
+    const agendamento = await atualizarAgendamentoNaRt(prisma, params.id, rtId, body, { tipo: 'COLABORADOR', colaboradorId: ator.colaboradorId }, ctx);
+
+    await broadcastPacientes(rtId, 'agendamento:atualizado', { agendamentoId: params.id, campos: Object.keys(body) });
+
+    return agendamento;
   },
 });
