@@ -84,7 +84,30 @@ export type AcaoAuditoria =
    */
   | 'CANCELAMENTO_SOLICITADO'
   | 'CANCELAMENTO_APROVADO'
-  | 'CANCELAMENTO_RECUSADO';
+  | 'CANCELAMENTO_RECUSADO'
+  /**
+   * Módulo de pacientes (branch `pacientes`, RNP-21, RNP-32 —
+   * `01-dominio/regras-negocio-pacientes.md`). Extensão aditiva, mesmo
+   * padrão do bloco acima. Separação/conferência/administração auditam como
+   * três eventos distintos, cada um com seu próprio ator (RNP-32) — nunca um
+   * evento só no fim do ciclo de checagem dupla.
+   */
+  | 'PACIENTE_CRIADO'
+  | 'PACIENTE_ATUALIZADO'
+  | 'PACIENTE_INATIVADO'
+  | 'AGENDAMENTO_CRIADO'
+  | 'AGENDAMENTO_ATUALIZADO'
+  | 'AGENDAMENTO_CANCELADO'
+  | 'AGENDAMENTO_CONCLUIDO'
+  | 'PRESCRICAO_CRIADA'
+  | 'PRESCRICAO_ATUALIZADA'
+  | 'PRESCRICAO_ENCERRADA'
+  | 'PRESCRICAO_SUSPENSA'
+  | 'MEDICACAO_SEPARADA'
+  | 'MEDICACAO_CONFERIDA'
+  | 'MEDICACAO_DIVERGENTE'
+  | 'MEDICACAO_ADMINISTRADA'
+  | 'MEDICACAO_RECUSADA';
 
 export interface EventoAuditoria {
   atorTipo: AtorTipo;
