@@ -107,6 +107,39 @@ describe('<CalendarioPlantoesClient /> — navegação entre ciclos (pedido do u
     await waitFor(() => expect(screen.getByText((_, el) => el?.textContent === 'Outubro 2026')).toBeInTheDocument());
   });
 
+  it('o saldo de extras acompanha o mês exibido — não trava no saldo do ciclo inicial (pedido do usuário)', async () => {
+    const saldoOutubro = { limite: 6, usadas: 5, restantes: 1, permiteCruzada: true, bloqueado: false, motivoBloqueio: null };
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/api/ciclos/vizinhos')) {
+        // Respeita ano/mes da query — a chamada dispara de novo após navegar
+        // (busca +1 em segundo plano), e precisa refletir o NOVO centro, não
+        // sempre o mesmo payload inicial (senão a "atual" reverteria pra
+        // setembro assim que essa chamada de segundo plano resolvesse).
+        return url.includes('mes=10')
+          ? jsonResponse(200, { anterior: CICLO_SETEMBRO, atual: cicloResumo(2026, 10), proximo: cicloResumo(2026, 11), servidorEm: 'x' })
+          : jsonResponse(200, { anterior: null, atual: CICLO_SETEMBRO, proximo: cicloResumo(2026, 10), servidorEm: 'x' });
+      }
+      if (url.includes('/api/meu-saldo') && url.includes('ciclo-2026-10')) return jsonResponse(200, saldoOutubro);
+      if (url.includes('/api/plantoes') && url.includes('ciclo-2026-10')) return jsonResponse(200, dadosOutubro);
+      if (url.includes('/api/plantoes') && url.includes('ciclo-2026-11')) return jsonResponse(200, dadosOutubro);
+      return jsonResponse(200, dadosSetembro);
+    });
+
+    render(<CalendarioPlantoesClient cicloInicial={CICLO_SETEMBRO} dadosIniciais={dadosSetembro} saldoInicial={saldoInicial} />);
+
+    // Ciclo inicial: mostra o saldo controlado (1/4), vindo de `saldoInicial` (SSR).
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1');
+
+    const botaoProximo = await screen.findByTitle(/ir para outubro/i);
+    await waitFor(() => expect(botaoProximo).toBeEnabled());
+    fireEvent.click(botaoProximo);
+
+    // Outubro: saldo tem que vir de `/api/meu-saldo?cicloId=ciclo-2026-10` — nunca travado no 1/4 antigo de setembro.
+    await waitFor(() => expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '5'));
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuemax', '6');
+  });
+
   it('chevron "anterior" fica desabilitado quando não há ciclo publicado anterior', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input);

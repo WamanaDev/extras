@@ -217,7 +217,19 @@ export function CalendarioPlantoesClient({
 
   return (
     <div className="space-y-6">
-      <SaldoExtras cicloId={cicloId} revalidarChave={saldoRevalidar} {...(saldoInicial ? { saldo: saldoInicial } : {})} />
+      {/*
+        `saldo` controlado só serve para o ciclo INICIAL (o de `saldoInicial`,
+        vindo do SSR) — pedido do usuário: o saldo tem que acompanhar o mês
+        exibido no calendário. Se passássemos `saldoInicial` sempre, o
+        `<SaldoExtras />` nunca buscaria de novo ao navegar (ele só refaz o
+        fetch quando `saldo` está `undefined`), travando pra sempre no saldo
+        do primeiro ciclo carregado.
+      */}
+      <SaldoExtras
+        cicloId={cicloId}
+        revalidarChave={saldoRevalidar}
+        {...(saldoInicial && cicloId === cicloInicial.id ? { saldo: saldoInicial } : {})}
+      />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
