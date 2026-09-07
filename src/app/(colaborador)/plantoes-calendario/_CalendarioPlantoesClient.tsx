@@ -8,8 +8,16 @@
  * (`disponivel`/`motivo`/`jaMarcado` decididos só pela API — FE-001.5):
  * este componente não recalcula vaga, cruzada, jornada ou limite, só agrupa
  * os plantões que a API já retornou por dia do ciclo.
+ *
+ * Navegação entre meses (pedido do usuário): os chevrons trocam de ciclo via
+ * `useNavegacaoCiclos` — só ciclos `PUBLICADO` (`FECHADO` é tratado como
+ * inexistente, "ciclo cancelado" nas palavras do usuário). Os DADOS
+ * (`/api/plantoes`) de cada ciclo são cacheados por `cicloId` neste
+ * componente: assim que a janela de navegação revela um vizinho, seus dados
+ * já são buscados em segundo plano — ao clicar no chevron, a troca é
+ * instantânea (sem tela de carregando), porque o conteúdo já estava pronto.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, Clock, RefreshCw, Sun, Moon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { get, post, type ErroApi } from '@/lib/api/client';
@@ -17,6 +25,7 @@ import { Button } from '@/components/ui/button';
 import { TextoComDica } from '@/components/ui/tooltip';
 import { SaldoExtras, type SaldoExtrasDados } from '@/components/extras/SaldoExtras';
 import { usePlantoesRealtime, type EstadoConexaoRealtime } from '@/hooks/usePlantoesRealtime';
+import { useNavegacaoCiclos, type CicloResumo } from '@/hooks/useNavegacaoCiclos';
 import type { GradePlantoesDados, PlantaoGrade, MotivoIndisponivel } from '@/components/plantoes/GradePlantoes';
 
 const TEXTO_CONEXAO: Record<EstadoConexaoRealtime, { texto: string; ponto: string }> = {
@@ -73,22 +82,28 @@ function montarGrade(ano: number, mes: number): CelulaCalendario[] {
 }
 
 export interface CalendarioPlantoesClientProps {
-  cicloId: string;
-  ano: number;
-  mes: number;
+  cicloInicial: CicloResumo;
   dadosIniciais?: GradePlantoesDados;
   saldoInicial?: SaldoExtrasDados;
 }
 
 export function CalendarioPlantoesClient({
-  cicloId,
-  ano,
-  mes,
+  cicloInicial,
   dadosIniciais,
   saldoInicial,
 }: CalendarioPlantoesClientProps): JSX.Element {
-  const [dados, setDados] = useState<GradePlantoesDados | null>(dadosIniciais ?? null);
-  const [carregando, setCarregando] = useState(dadosIniciais === undefined);
+  const nav = useNavegacaoCiclos(cicloInicial);
+  const cicloId = nav.atual.id;
+  const ano = nav.atual.ano;
+  const mes = nav.atual.mes;
+
+  // Cache por `cicloId` — pedido do usuário: navegar não pode mostrar tela
+  // de carregando, então os dados de um ciclo vizinho são buscados em
+  // segundo plano assim que a navegação revela sua existência (ver `useEffect`
+  // de prefetch abaixo), antes mesmo do usuário clicar no chevron.
+  const [cache, setCache] = useState<Record<string, GradePlantoesDados>>(() =>
+    dadosIniciais ? { [cicloInicial.id]: dadosIniciais } : {},
+  );
   const [erroCarga, setErroCarga] = useState<string | null>(null);
   const [erroPorPlantao, setErroPorPlantao] = useState<Record<string, string>>({});
   const [emAndamento, setEmAndamento] = useState<Record<string, boolean>>({});
@@ -96,34 +111,44 @@ export function CalendarioPlantoesClient({
   const [diaSelecionado, setDiaSelecionado] = useState<string | null>(null);
   const [atualizandoManual, setAtualizandoManual] = useState(false);
 
-  const dadosRef = useRef(dados);
-  dadosRef.current = dados;
+  const cacheRef = useRef(cache);
+  cacheRef.current = cache;
 
-  async function buscar(): Promise<void> {
-    const primeiraCarga = dadosRef.current === null;
-    if (primeiraCarga) setCarregando(true);
-    setErroCarga(null);
-    const resultado = await get<GradePlantoesDados>(`/api/plantoes?cicloId=${encodeURIComponent(cicloId)}`);
+  const dados = cache[cicloId] ?? null;
+  // Só é `true` quando o ciclo ativo ainda não está em cache — o caso comum
+  // (prefetch já rodou antes do clique) nunca passa por aqui.
+  const carregando = dados === null;
+
+  /** `forcar: true` ignora o cache (realtime/pós-marcação sempre quer o dado mais fresco). */
+  const buscarCiclo = useCallback(async (idAlvo: string, opcoes?: { forcar?: boolean }): Promise<void> => {
+    if (!opcoes?.forcar && cacheRef.current[idAlvo]) return;
+    if (idAlvo === cicloId) setErroCarga(null);
+    const resultado = await get<GradePlantoesDados>(`/api/plantoes?cicloId=${encodeURIComponent(idAlvo)}`);
     if (resultado.ok) {
-      setDados(resultado.dados);
-    } else if (primeiraCarga) {
+      setCache((atual) => ({ ...atual, [idAlvo]: resultado.dados }));
+    } else if (idAlvo === cicloId) {
       setErroCarga(resultado.erro.mensagem);
     }
-    if (primeiraCarga) setCarregando(false);
-  }
-
-  // A carga inicial normalmente vem pronta do servidor (`dadosIniciais`); se
-  // ela faltar (ex.: a chamada no servidor falhou), busca uma vez ao montar
-  // — mesma lacuna que `<GradePlantoes />` já cobre com `primeiraRenderizacao`.
-  const primeiraRenderizacao = useRef(true);
-  useEffect(() => {
-    if (primeiraRenderizacao.current) {
-      primeiraRenderizacao.current = false;
-      if (dadosIniciais !== undefined) return;
-    }
-    void buscar();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cicloId]);
+
+  // Busca o ciclo ativo se ainda não estiver em cache (ex.: `dadosIniciais`
+  // faltou, ou o usuário navegou pra um ciclo que o prefetch abaixo ainda
+  // não tinha alcançado) e pré-busca os vizinhos revelados pela navegação.
+  useEffect(() => {
+    void buscarCiclo(cicloId);
+    if (nav.anterior) void buscarCiclo(nav.anterior.id);
+    if (nav.proximo) void buscarCiclo(nav.proximo.id);
+  }, [cicloId, nav.anterior, nav.proximo, buscarCiclo]);
+
+  // Troca de ciclo (navegação) não deve carregar o dia selecionado do mês
+  // anterior — a data pode nem existir no novo mês.
+  useEffect(() => {
+    setDiaSelecionado(null);
+  }, [cicloId]);
+
+  async function buscar(): Promise<void> {
+    await buscarCiclo(cicloId, { forcar: true });
+  }
 
   const { estadoConexao } = usePlantoesRealtime(cicloId, () => void buscar());
 
@@ -174,18 +199,18 @@ export function CalendarioPlantoesClient({
     setErroPorPlantao((atual) => ({ ...atual, [plantaoId]: erro.mensagem }));
   }
 
-  if (carregando && !dados) {
+  if (!dados && erroCarga) {
     return (
-      <div role="status" aria-live="polite" className="rounded-lg border border-slate-200 bg-white p-4">
-        Carregando calendário de plantões…
+      <div role="alert" className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-900">
+        {erroCarga}
       </div>
     );
   }
 
-  if (erroCarga) {
+  if (carregando) {
     return (
-      <div role="alert" className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-900">
-        {erroCarga}
+      <div role="status" aria-live="polite" className="rounded-lg border border-slate-200 bg-white p-4">
+        Carregando calendário de plantões…
       </div>
     );
   }
@@ -201,7 +226,6 @@ export function CalendarioPlantoesClient({
               <CalendarDays className="h-4 w-4 text-slate-500" aria-hidden="true" />
               {NOMES_MES[mes - 1]} {ano}
             </div>
-            {/* Ciclo mensal fixo (a página busca o ciclo atual) — sem navegação de mês por enquanto. */}
             <div className="flex items-center gap-3">
               <span className="flex items-center gap-1.5 text-xs text-slate-500" role="status" aria-live="polite">
                 <span className={cn('h-1.5 w-1.5 rounded-full', TEXTO_CONEXAO[estadoConexao].ponto)} />
@@ -217,9 +241,25 @@ export function CalendarioPlantoesClient({
               >
                 <RefreshCw className={cn('h-4 w-4', atualizandoManual && 'animate-spin')} aria-hidden="true" />
               </button>
-              <div className="hidden gap-1 text-slate-300 sm:flex">
-                <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-                <ChevronRight className="h-4 w-4" aria-hidden="true" />
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={nav.irParaAnterior}
+                  disabled={!nav.anterior}
+                  title={nav.anterior ? `Ir para ${NOMES_MES[nav.anterior.mes - 1]} ${nav.anterior.ano}` : 'Nenhum ciclo publicado anterior'}
+                  className="rounded-full p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:pointer-events-none disabled:opacity-30"
+                >
+                  <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  onClick={nav.irParaProximo}
+                  disabled={!nav.proximo}
+                  title={nav.proximo ? `Ir para ${NOMES_MES[nav.proximo.mes - 1]} ${nav.proximo.ano}` : 'Nenhum ciclo publicado seguinte'}
+                  className="rounded-full p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:pointer-events-none disabled:opacity-30"
+                >
+                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                </button>
               </div>
             </div>
           </div>

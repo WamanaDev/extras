@@ -12,9 +12,11 @@ que falhe se a regra for removida.
 | # | Cenário | Esperado |
 |---|---|---|
 | C-PAC-1 | 20 criações paralelas de agendamento sobreposto para o mesmo paciente | 1 sucesso, 19 `CONFLITO_AGENDA_PACIENTE` |
-| C-PAC-2 | 10 registros paralelos da mesma dose prevista | 1 sucesso, 9 `DOSE_JA_REGISTRADA` |
+| C-PAC-2 | 10 separações paralelas da mesma dose prevista | 1 sucesso, 9 `DOSE_JA_SEPARADA` |
 | C-PAC-3 | Cancelar e concluir o mesmo agendamento em paralelo | um vence, outro recebe estado terminal, sem corrupção |
-| C-PAC-4 | 2h de carga concorrente em `registrar_administracao` | zero deadlocks |
+| C-PAC-4 | 2h de carga concorrente em `separar_medicamento`/`conferir_medicamento`/`administrar_medicamento` | zero deadlocks |
+| C-PAC-5 | Duas conferências paralelas na mesma dose `SEPARADO` | uma sucesso, outra `DOSE_NAO_SEPARADA` |
+| C-PAC-6 | Duas tentativas paralelas de administrar a mesma dose `CONFERIDO` | uma sucesso, outra `DOSE_NAO_CONFERIDA` |
 
 ## Segurança (análogo a `TST-004`)
 
@@ -25,6 +27,9 @@ que falhe se a regra for removida.
 | S-PAC-3 | Varredura de log por `observacoesClinicas`, `dose`, `instrucoes`, `observacao` de administração | zero ocorrências |
 | S-PAC-4 | Notificação push de dose/agendamento | corpo sem nome de medicamento ou motivo |
 | S-PAC-5 | `app_readonly` lendo `prescricao`/`administracao_medicamento` | negado |
+| S-PAC-6 | Chamar `conferir_medicamento` com `colaboradorId` = `separado_por_id` da dose, direto na função (bypass de rota hipotético) | rejeitado por `FN-015` **e** por `chk_separador_conferente_distintos` |
+| S-PAC-7 | Chamar `administrar_medicamento` com `colaboradorId` fora de `{separado_por_id, conferido_por_id}` | rejeitado por `FN-016` **e** por `chk_administrador_participou` |
+| S-PAC-8 | Forjar `conferido_por_id`/`separado_por_id` via body de `API-MED-008`/`API-MED-009` | ignorado — rota usa só o ator da sessão |
 
 ## Paridade (regra de negócio replicada em mais de um lugar)
 
@@ -32,6 +37,7 @@ que falhe se a regra for removida.
 |---|---|---|
 | P-PAC-1 | Cálculo de `minutos_atraso` em `FN-014` vs. exibido em `<PainelAlertasMedicacao />` | idêntico, sem recálculo no cliente |
 | P-PAC-2 | Geração de administrações `PENDENTE` na criação da prescrição vs. contagem manual (dias × horários) | idêntico |
+| P-PAC-3 | Botões habilitados em `<AcaoEtapaDose />` vs. o que `FN-015`/`FN-016` de fato aceitariam para o mesmo ator | idêntico — nenhum botão visível que o servidor recusaria |
 
 ## Cobertura de `RNP-*`
 

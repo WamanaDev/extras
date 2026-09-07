@@ -107,6 +107,18 @@ export function diaDaSemana(data: Date): number {
   return data.getUTCDay();
 }
 
+/**
+ * Paridade do DIA DO MÊS (`data.getUTCDate()` par/ímpar) — pedido do usuário
+ * para o gerador de lote de plantões (`API-ADM-PLA-002`): filtrar um
+ * intervalo só nos dias pares ou só nos ímpares do calendário. Não confundir
+ * com a paridade de ESCALA (`src/lib/escala/ancora.ts`, `Paridade`), que é
+ * relativa à âncora de cada colaborador — esta aqui é sempre absoluta
+ * (dia 1, 3, 5... é ímpar pra qualquer plantão, não depende de ninguém).
+ */
+export function paridadeDoDia(data: Date): 'PAR' | 'IMPAR' {
+  return data.getUTCDate() % 2 === 0 ? 'PAR' : 'IMPAR';
+}
+
 /** Itera cada dia civil de `[de, ate]`, inclusive dos dois lados. */
 export function* diasEntre(de: Date, ate: Date): Generator<Date> {
   const cursor = new Date(Date.UTC(de.getUTCFullYear(), de.getUTCMonth(), de.getUTCDate()));

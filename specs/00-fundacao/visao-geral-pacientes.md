@@ -21,9 +21,11 @@ RT, sem histórico consultável nem alerta de horário. Três problemas concreto
 ## Escopo
 
 **Dentro:** cadastro de paciente pelo admin; colaborador da RT do paciente cria e gerencia
-agendamentos (consulta e saída); catálogo e prescrição de medicamentos; registro de
-administração (MAR — medication administration record); calendário de agenda por RT; alertas de
-dose pendente/atrasada; auditoria de tudo.
+agendamentos (consulta e saída); colaborador registra receitas/prescrições (medicamento
+temporário ou definitivo) e opera o ciclo de administração com **checagem dupla** — um
+colaborador separa a dose, outro confere, e só então um dos dois (nunca um terceiro) ministra;
+calendário de agenda por RT; alertas de dose pendente/atrasada/parada em separação; auditoria de
+cada etapa.
 
 **Fora (por ora):** prontuário eletrônico completo, prescrição eletrônica assinada por médico
 externo ao sistema, faturamento de convênio, integração com farmácia, telemedicina.
@@ -32,13 +34,15 @@ externo ao sistema, faturamento de convênio, integração com farmácia, teleme
 
 | Ator | Pode |
 |---|---|
-| Administrador | Cadastrar/editar/inativar paciente, transferir entre RTs, gerenciar catálogo de medicamentos e prescrições, ver tudo em ambas as RTs |
-| Colaborador | Ver pacientes e agenda **só da própria RT** (`RNP-01`); criar/editar/cancelar agendamento (consulta e saída); registrar administração de medicamento |
-| Sistema | Alertas de dose pendente/atrasada, lembrete de agendamento próximo |
+| Administrador | Cadastrar/editar/inativar paciente, transferir entre RTs, gerenciar catálogo de medicamentos (referência), ver tudo em ambas as RTs; pode também registrar/editar prescrição e conduzir a checagem dupla, para correção ou cobertura administrativa |
+| Colaborador | Ver pacientes e agenda **só da própria RT** (`RNP-01`); criar/editar/cancelar agendamento (consulta e saída); registrar receita/prescrição (temporária ou definitiva); separar, conferir e administrar medicamento |
+| Sistema | Alertas de dose pendente/atrasada/parada em separação, lembrete de agendamento próximo |
 
 Não há papel clínico diferenciado nesta primeira versão — qualquer colaborador lotado na RT do
-paciente pode agendar, registrar saída e registrar medicação (decisão de produto; revisar se o
-volume de erro de administração justificar segregação de função no futuro).
+paciente pode agendar, registrar saída, lançar prescrição e participar da checagem dupla
+(decisão de produto; revisar se o volume de erro justificar segregação de função no futuro).
+A segurança da administração de medicamento **não** depende de papel diferenciado — depende de
+**duas pessoas distintas** em separação e conferência (`RNP-26`), o que vale com papel único.
 
 ## Separação por RT
 

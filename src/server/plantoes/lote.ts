@@ -14,6 +14,7 @@ import {
   diasEntre,
   horaParaData,
   horasPadraoDoTurno,
+  paridadeDoDia,
 } from './util';
 
 export interface GerarLoteInput {
@@ -26,6 +27,8 @@ export interface GerarLoteInput {
   // `| undefined` explícito: campo `.optional()` de `LoteSchema`
   // (`lote/route.ts`) — `exactOptionalPropertyTypes` (`_conflitos.md`, item 13).
   diasSemana?: number[] | undefined;
+  /** Filtro por paridade do DIA DO MÊS (pedido do usuário) — `undefined`/`'AMBOS'` não filtra. */
+  paridade?: 'PAR' | 'IMPAR' | 'AMBOS' | undefined;
   permiteCruzada: boolean | null;
   preview: boolean;
 }
@@ -65,6 +68,7 @@ function gerarCombos(input: GerarLoteInput): Combo[] {
   const combos: Combo[] = [];
   for (const data of diasEntre(input.de, input.ate)) {
     if (input.diasSemana && !input.diasSemana.includes(diaDaSemana(data))) continue;
+    if (input.paridade && input.paridade !== 'AMBOS' && paridadeDoDia(data) !== input.paridade) continue;
     for (const rtId of input.rtIds) {
       for (const tipo of input.tipos) {
         combos.push({ data, rtId, tipo });

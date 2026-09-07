@@ -1,19 +1,21 @@
 'use client';
 
 /**
- * `/(colaborador)/minhas-extras` — marcações + cancelamento (API-COL-006/005).
+ * `/(colaborador)/minhas-extras` — marcações + pedido de cancelamento
+ * (API-COL-006/005).
  *
- * Cancelar uma extra é uma ação destrutiva (perde a vaga, pode não haver
- * outra até o fim da janela) — exige `<ConfirmacaoImpacto />` com o impacto
- * listado antes de confirmar (FE-001.6), mesmo sendo só um item.
- * `podeCancelar` vem sempre da API (FE-001.5): o botão de cancelar nem
- * aparece quando a API já decidiu que não pode.
+ * Pedido do usuário: colaborador não cancela mais a própria extra direto —
+ * "Cancelar" abre um pedido (`solicitacao_cancelamento`, `PENDENTE`) que
+ * QUALQUER admin aprova ou recusa depois. `podeCancelar` vem sempre da API
+ * (FE-001.5): o botão nem aparece quando já não pode mais pedir (marcação
+ * cancelada, ciclo fechado/janela encerrada, ou já existe um pedido
+ * pendente). `motivo` é obrigatório — é o que o admin vê antes de decidir.
  */
 import { useEffect, useState } from 'react';
 import { get, del } from '@/lib/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ConfirmacaoImpacto } from '@/components/comum/ConfirmacaoImpacto';
+import { Dialog } from '@/components/ui/dialog';
 
 export interface Marcacao {
   id: string;
@@ -27,6 +29,7 @@ export interface Marcacao {
   criadoEm: string;
   canceladoEm: string | null;
   podeCancelar: boolean;
+  cancelamentoPendente: boolean;
 }
 
 export interface MinhasMarcacoesDados {
@@ -45,8 +48,10 @@ export function MinhasExtrasClient({
   const [carregando, setCarregando] = useState(dadosIniciais === undefined);
   const [erroCarga, setErroCarga] = useState<string | null>(null);
   const [paraCancelar, setParaCancelar] = useState<Marcacao | null>(null);
+  const [motivo, setMotivo] = useState('');
   const [cancelando, setCancelando] = useState(false);
   const [erroCancelamento, setErroCancelamento] = useState<string | null>(null);
+  const [avisoSucesso, setAvisoSucesso] = useState<string | null>(null);
 
   async function buscar(): Promise<void> {
     setCarregando(true);
@@ -66,19 +71,32 @@ export function MinhasExtrasClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cicloId]);
 
-  async function confirmarCancelamento(): Promise<void> {
-    if (!paraCancelar) return;
+  function abrirPedido(marcacao: Marcacao): void {
+    setErroCancelamento(null);
+    setMotivo('');
+    setParaCancelar(marcacao);
+  }
+
+  async function confirmarPedido(): Promise<void> {
+    if (!paraCancelar || motivo.trim() === '') return;
     setCancelando(true);
     setErroCancelamento(null);
-    const resultado = await del<{ id: string; status: string }>(`/api/marcacoes/${paraCancelar.id}`);
+    const resultado = await del<{ status: 'PENDENTE'; jaExistia: boolean }>(`/api/marcacoes/${paraCancelar.id}`, {
+      body: JSON.stringify({ motivo: motivo.trim() }),
+    });
     setCancelando(false);
     if (!resultado.ok) {
-      // FE-001.4: erro de negócio (JANELA_ENCERRADA, CICLO_FECHADO) fica
-      // inline no modal, nunca vira toast e nunca fecha silenciosamente.
+      // FE-001.4: erro de negócio fica inline no modal, nunca vira toast e nunca fecha silenciosamente.
       setErroCancelamento(resultado.erro.mensagem);
       return;
     }
     setParaCancelar(null);
+    setMotivo('');
+    setAvisoSucesso(
+      resultado.dados.jaExistia
+        ? 'Já existe um pedido de cancelamento em análise para esta extra.'
+        : 'Pedido de cancelamento enviado. Um administrador vai revisar em breve.',
+    );
     await buscar();
   }
 
@@ -123,6 +141,12 @@ export function MinhasExtrasClient({
         </div>
       </dl>
 
+      {avisoSucesso ? (
+        <p role="status" className="text-sm text-emerald-800">
+          {avisoSucesso}
+        </p>
+      ) : null}
+
       <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
         {dados.marcacoes.map((marcacao) => (
           <li key={marcacao.id} className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
@@ -140,15 +164,10 @@ export function MinhasExtrasClient({
               <Badge variant={marcacao.status === 'CONFIRMADA' ? 'success' : 'secondary'}>
                 {marcacao.status === 'CONFIRMADA' ? 'Confirmada' : 'Cancelada'}
               </Badge>
-              {marcacao.podeCancelar ? (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => {
-                    setErroCancelamento(null);
-                    setParaCancelar(marcacao);
-                  }}
-                >
+              {marcacao.cancelamentoPendente ? (
+                <Badge variant="outline">Cancelamento em análise</Badge>
+              ) : marcacao.podeCancelar ? (
+                <Button variant="destructive" size="sm" onClick={() => abrirPedido(marcacao)}>
                   Cancelar
                 </Button>
               ) : null}
@@ -157,29 +176,44 @@ export function MinhasExtrasClient({
         ))}
       </ul>
 
-      <ConfirmacaoImpacto
-        aberto={paraCancelar !== null}
-        titulo="Cancelar extra"
-        mensagem="Você vai liberar esta vaga para outro colaborador. Esta ação não pode ser desfeita — se mudar de ideia, terá que marcar de novo, se ainda houver vaga."
-        itens={
-          paraCancelar
-            ? [
-                `${paraCancelar.data} · ${paraCancelar.rt} · ${paraCancelar.tipo === 'DIURNO' ? 'Diurno' : 'Noturno'} · ${paraCancelar.horaInicio}–${paraCancelar.horaFim}`,
-              ]
-            : []
-        }
-        carregando={cancelando}
-        onConfirmar={() => void confirmarCancelamento()}
-        onCancelar={() => {
-          setParaCancelar(null);
-          setErroCancelamento(null);
-        }}
-      />
-      {erroCancelamento ? (
-        <p role="alert" className="text-sm text-red-700">
-          {erroCancelamento}
+      <Dialog aberto={paraCancelar !== null} onFechar={() => setParaCancelar(null)} titulo="Pedir cancelamento">
+        <p className="text-sm text-slate-600">
+          Isto não cancela a extra na hora — abre um pedido que um administrador precisa aprovar. Você pode acompanhar o
+          status aqui mesmo.
         </p>
-      ) : null}
+        {paraCancelar ? (
+          <p className="mt-2 text-sm font-medium text-slate-900">
+            {paraCancelar.data} · {paraCancelar.rt} · {paraCancelar.tipo === 'DIURNO' ? 'Diurno' : 'Noturno'} ·{' '}
+            {paraCancelar.horaInicio}–{paraCancelar.horaFim}
+          </p>
+        ) : null}
+
+        <label className="mt-4 flex flex-col text-sm text-slate-800">
+          Motivo do cancelamento
+          <textarea
+            value={motivo}
+            onChange={(evento) => setMotivo(evento.target.value)}
+            rows={3}
+            className="mt-1 rounded border border-slate-300 p-2"
+            placeholder="Ex.: imprevisto pessoal, conflito de horário…"
+          />
+        </label>
+
+        {erroCancelamento ? (
+          <p role="alert" className="mt-2 text-sm text-red-700">
+            {erroCancelamento}
+          </p>
+        ) : null}
+
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="outline" onClick={() => setParaCancelar(null)} disabled={cancelando}>
+            Voltar
+          </Button>
+          <Button variant="destructive" onClick={() => void confirmarPedido()} disabled={cancelando || motivo.trim() === ''}>
+            {cancelando ? 'Enviando…' : 'Enviar pedido'}
+          </Button>
+        </div>
+      </Dialog>
     </div>
   );
 }

@@ -3,13 +3,13 @@
 - **ID:** API-MED-006
 - **Status:** RASCUNHO
 - **Ator:** Colaborador
-- **Pré-requisitos:** `API-MED-001`
+- **Pré-requisitos:** `API-MED-001`, `RNP-30`
 - **Entregáveis:** `src/app/api/pacientes/[pacienteId]/administracoes/route.ts`
 
 ## Objetivo
 
-Histórico de MAR do paciente — o que foi dado, quando, por quem, incluindo pendências e atrasos.
-Tela principal de conferência do plantão.
+Histórico de MAR do paciente — o que foi dado, quando, por quem em **cada etapa**, incluindo
+pendências, doses paradas em separação e atrasos. Tela principal de conferência do plantão.
 
 ## Contrato
 
@@ -18,23 +18,29 @@ Tela principal de conferência do plantão.
 
 ### Response 200
 ```ts
-Array<{ id, medicamentoNome, dose, horarioPrevisto, horarioAdministrado,
-        status, colaboradorNome, observacao }>
+Array<{
+  id, medicamentoNome, dose, horarioPrevisto, status,
+  separadoPorNome?, separadoEm?,
+  conferidoPorNome?, conferidoEm?,
+  administradoPorNome?, administradoEm?,
+  observacao?
+}>
 ```
 
-`observacao` só aparece se preenchida por recusa/PRN — não é dado de terceiro sensível além do
-já coberto por `SEC-SAUDE` (paciente da própria RT do ator).
+Cada etapa aparece só quando já ocorreu — uma dose ainda `PENDENTE` não tem nenhum dos campos de
+etapa preenchido; uma `SEPARADO` só tem `separadoPor*`; e assim por diante (`RNP-30`).
 
 ## Fluxo
 
 1. Paciente restrito à RT do ator (`404` senão)
 2. Juntar `administracao_medicamento` de todas as prescrições do paciente no período,
-   ordenado por `horario_previsto`/`horario_administrado`
+   ordenado por `horario_previsto`/`criado_em`
 
 ## Testes de aceitação
 
 | # | Teste | Esperado |
 |---|---|---|
-| 1 | Dia com 3 doses regulares + 1 PRN | 4 linhas |
-| 2 | Dose `PENDENTE` vencida | aparece com `status = PENDENTE` (rótulo `ATRASADO` calculado no cliente a partir de `FN-014`, não duplicado aqui) |
-| 3 | Paciente de outra RT | 404 |
+| 1 | Dia com 3 doses regulares + 1 PRN, todas administradas | 4 linhas com as 3 etapas preenchidas |
+| 2 | Dose `SEPARADO` sem conferência | só `separadoPor*` preenchido |
+| 3 | Dose `DIVERGENTE` | aparece com `observacao`, sem `administradoPor*` |
+| 4 | Paciente de outra RT | 404 |

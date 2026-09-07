@@ -2,7 +2,7 @@
 -- PENDENTE DE EXECUÇÃO NESTE AMBIENTE (mesma nota de fn-003/fn-004.pgtap.sql)
 -- ============================================================================
 -- Testes pgTAP para specs/03-banco/funcoes/fn-005-marcar-extra.md (FN-005),
--- seção "Testes de aceitação": F5-1..F5-14. Este ambiente de agente não tem
+-- seção "Testes de aceitação": F5-1, F5-5..F5-16. Este ambiente de agente não tem
 -- Docker daemon acessível nem `pg_prove`/extensão `pgtap` instalados
 -- localmente, então este arquivo NÃO FOI EXECUTADO — escrito e pronto para
 -- rodar assim que:
@@ -36,7 +36,7 @@
 -- (READ COMMITTED, sessões diferentes) — logo os fixtures usados pelas
 -- partes concorrentes não podem viver dentro de um BEGIN…ROLLBACK que nunca
 -- comita. Por isso:
---   • Parte A (F5-1, F5-5..F5-13): sequencial, cada teste em sua própria
+--   • Parte A (F5-1, F5-5..F5-13, F5-15..F5-16): sequencial, cada teste em sua própria
 --     transação curta que comita (não há necessidade de isolamento entre
 --     eles — cada um usa fixtures com IDs próprios).
 --   • Parte B (F5-2, F5-3, F5-4, F5-14): fixtures comitados, `dblink` abre N
@@ -62,7 +62,7 @@
 -- fn-004-valida-descanso.pgtap.sql.
 -- ============================================================================
 
-SELECT plan(23);
+SELECT plan(25);
 
 -- ----------------------------------------------------------------------------
 -- Fixtures compartilhados (Parte A e Parte B). Comitados de propósito — ver
@@ -91,7 +91,7 @@ INSERT INTO ciclo (
 -- fica visível para as sessões dblink da Parte B assim que o INSERT retorna.
 
 -- ============================================================================
--- PARTE A — sequencial (F5-1, F5-5..F5-13)
+-- PARTE A — sequencial (F5-1, F5-5..F5-13, F5-15..F5-16)
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -348,6 +348,48 @@ SELECT throws_ok(
                           '00000000-0000-0000-0000-000000050a01'::uuid, 'ADMIN'::origem_marcacao) $$,
   'EXCEDE_JORNADA',
   'F5-13: ADMIN formando 3º bloco contíguo (36h, max_blocos=2) → EXCEDE_JORNADA'
+);
+
+-- ----------------------------------------------------------------------------
+-- F5-15: RN-16 estendida (pedido do usuário, ver 20260906130000_fn005_fn007_
+-- ausencia_turno_seguinte). Colaborador NOTURNO com folga (F) registrada em
+-- 2026-09-20; extra NOTURNA em 2026-09-19 (19:00 → 20/09 07:00) "termina"
+-- dentro da madrugada do dia de folga → EM_AUSENCIA mesmo sem sobreposição
+-- literal de horário com o intervalo interno de escala_dia do dia 20.
+-- ----------------------------------------------------------------------------
+INSERT INTO colaborador (id, matricula, nome, cpf_hash, cpf_ultimos4, rt_id, turno_padrao, escala_ancora)
+  VALUES ('00000000-0000-0000-0000-000000050b01', 'MAT9111', 'Colaborador F5-15', 'hash9111', '9111',
+          '00000000-0000-0000-0000-000000050001', 'NOTURNO', '2026-01-01');
+
+INSERT INTO escala_dia (id, colaborador_id, ciclo_id, codigo_escala_id, data, hora_inicio, hora_fim)
+  VALUES ('00000000-0000-0000-0000-000000050b02', '00000000-0000-0000-0000-000000050b01',
+          '00000000-0000-0000-0000-000000050005', '00000000-0000-0000-0000-000000050004',
+          '2026-09-20', '19:00', '07:00');
+
+INSERT INTO plantao (id, ciclo_id, rt_id, data, tipo, hora_inicio, hora_fim, carga_horas, vagas_totais)
+  VALUES ('00000000-0000-0000-0000-000000050b03', '00000000-0000-0000-0000-000000050005',
+          '00000000-0000-0000-0000-000000050001', '2026-09-19', 'NOTURNO', '19:00', '07:00', 12, 5);
+
+SELECT throws_ok(
+  $$ SELECT marcar_extra('00000000-0000-0000-0000-000000050b03'::uuid,
+                          '00000000-0000-0000-0000-000000050b01'::uuid) $$,
+  'EM_AUSENCIA',
+  'F5-15: extra NOTURNA na véspera (19/09) de dia com F (20/09) → EM_AUSENCIA'
+);
+
+-- ----------------------------------------------------------------------------
+-- F5-16 (controle negativo): mesma véspera (19/09), mesmo colaborador, mas
+-- extra DIURNA (07:00 → 19:00) nunca cruza a meia-noite → não deve olhar o
+-- dia seguinte, permanece permitido.
+-- ----------------------------------------------------------------------------
+INSERT INTO plantao (id, ciclo_id, rt_id, data, tipo, hora_inicio, hora_fim, carga_horas, vagas_totais)
+  VALUES ('00000000-0000-0000-0000-000000050b04', '00000000-0000-0000-0000-000000050005',
+          '00000000-0000-0000-0000-000000050001', '2026-09-19', 'DIURNO', '07:00', '19:00', 12, 5);
+
+SELECT lives_ok(
+  $$ SELECT marcar_extra('00000000-0000-0000-0000-000000050b04'::uuid,
+                          '00000000-0000-0000-0000-000000050b01'::uuid) $$,
+  'F5-16: extra DIURNA na véspera de um F não cruza a meia-noite → permitido (controle negativo)'
 );
 
 -- ============================================================================

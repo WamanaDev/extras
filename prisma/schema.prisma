@@ -188,6 +188,7 @@ model Colaborador {
   notificacoes      Notificacao[]
   pushSubscriptions PushSubscription[]
   googleCalendarConta GoogleCalendarConta?
+  solicitacoesCancelamento SolicitacaoCancelamento[]
 
   @@map("colaborador")
 }
@@ -342,7 +343,44 @@ model Marcacao {
   /// RESTRICT: histórico não se perde mesmo se o colaborador for removido (modelo-dados.md).
   colaborador Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Restrict)
 
+  solicitacoesCancelamento SolicitacaoCancelamento[]
+
   @@map("marcacao")
+}
+
+/// Pedido de cancelamento de uma extra pelo colaborador (pedido do usuário) —
+/// colaborador não cancela mais direto, precisa de aprovação de qualquer
+/// admin. Cancelamento de fato só acontece quando um admin APROVA (chama
+/// `cancelar_extra`, FN-006, origem ADMIN); RECUSADA não toca a marcação.
+enum StatusSolicitacaoCancelamento {
+  PENDENTE
+  APROVADA
+  RECUSADA
+
+  @@map("status_solicitacao_cancelamento")
+}
+
+model SolicitacaoCancelamento {
+  id            String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  marcacaoId    String                        @map("marcacao_id") @db.Uuid
+  colaboradorId String                        @map("colaborador_id") @db.Uuid
+  /// Por que o colaborador quer cancelar — obrigatório, é o que o admin vê antes de decidir.
+  motivo        String
+  status        StatusSolicitacaoCancelamento @default(PENDENTE)
+  /// Preenchido pelo admin ao resolver — obrigatório numa recusa (explica o "não" pro colaborador), opcional numa aprovação.
+  motivoResolucao String?   @map("motivo_resolucao")
+  /// Admin que aprovou/recusou (uuid de `auth.users`, sem FK — mesmo padrão de `troca_escala.criadoPorId`; qualquer admin serve, não um específico).
+  resolvidoPorId  String?   @map("resolvido_por_id") @db.Uuid
+  resolvidoEm     DateTime? @map("resolvido_em") @db.Timestamptz(6)
+  criadoEm        DateTime  @default(now()) @map("criado_em") @db.Timestamptz(6)
+
+  marcacao    Marcacao    @relation(fields: [marcacaoId], references: [id], onDelete: Cascade)
+  colaborador Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Cascade)
+
+  /// Fila do admin: pendentes primeiro, mais antigas primeiro.
+  @@index([status, criadoEm])
+  @@index([colaboradorId])
+  @@map("solicitacao_cancelamento")
 }
 
 /// Override por colaborador dentro de um ciclo (limite, cruzada, bloqueio — API-ADM-PAR-001).

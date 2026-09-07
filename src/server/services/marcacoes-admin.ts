@@ -29,12 +29,24 @@
  * coluna — só `cancelado_em`. Resolvido lendo o `ator_id` do evento
  * `EXTRA_CANCELADA` mais recente em `audit_log` para cada marcação
  * cancelada da página (`buscarCanceladoPorPorMarcacao` abaixo).
+ *
+ * `marcarExtraAdmin` com `novoPlantao` (pedido do usuário, ver `_conflitos.md`):
+ * cria um plantão de 1 vaga exclusivo pra esta marcação, reaproveitando
+ * `criarPlantao` (`API-ADM-PLA-001`, `@/server/plantoes/criar`) — mesma
+ * transação de `marcar_extra`/`registrarAuditoria` já usada abaixo, não uma
+ * transação própria: se `marcar_extra` rejeitar depois (`EM_AUSENCIA`,
+ * `EXCEDE_JORNADA`, etc.), o `ROLLBACK` desfaz a criação do plantão junto —
+ * nunca sobra um plantão vazio órfão por causa de uma marcação que não deu
+ * certo (mesma garantia de "A" de ACID que todo o resto deste arquivo já
+ * segue).
  */
 import type { PrismaClient } from '@prisma/client';
+import type { Turno } from '@prisma/client';
 import type { ClienteTransacao } from '@/server/db/tx';
 import { emTransacao } from '@/server/db/tx';
 import { registrarAuditoria } from '@/server/audit/registrar';
 import { erroInterno } from '@/server/http/erros';
+import { criarPlantao } from '@/server/plantoes/criar';
 
 /** Cliente de transação real ou fake injetado em teste — só os métodos usados aqui. */
 export type ClienteBanco = Pick<PrismaClient, '$transaction'>;
@@ -205,8 +217,21 @@ export async function listarMarcacoesAdmin(prisma: ClienteBanco, filtros: Filtro
 // Marcar (API-ADM-MAR-002)
 // ----------------------------------------------------------------------------
 
+/** Dados de um plantão novo, criado exclusivamente para esta marcação (pedido do usuário) — sempre `vagasTotais: 1`, nunca reaproveitável por outra marcação. */
+export interface NovoPlantaoParaMarcacao {
+  cicloId: string;
+  rtId: string;
+  data: Date;
+  tipo: Turno;
+  horaInicio?: string | undefined;
+  horaFim?: string | undefined;
+  permiteCruzada: boolean | null;
+}
+
 export interface MarcarExtraAdminParams {
-  plantaoId: string;
+  /** Exatamente um entre `plantaoId` (plantão existente) e `novoPlantao` (cria na mesma transação) — validado em `route.ts`. */
+  plantaoId?: string | undefined;
+  novoPlantao?: NovoPlantaoParaMarcacao | undefined;
   colaboradorId: string;
   motivo: string;
   adminId: string;
@@ -239,12 +264,43 @@ interface LinhaSaldo {
 
 export async function marcarExtraAdmin(prisma: ClienteBanco, params: MarcarExtraAdminParams): Promise<RespostaMarcarExtraAdmin> {
   return emTransacao(prisma as PrismaClient, async (tx) => {
+    // 0. `novoPlantao` (pedido do usuário): cria o plantão exclusivo pra esta
+    // marcação ANTES de chamar marcar_extra, na mesma transação — reaproveita
+    // `criarPlantao` (API-ADM-PLA-001) sem duplicar suas regras (CICLO_FECHADO,
+    // DATA_FORA_DO_CICLO, PLANTAO_JA_EXISTE). `vagasTotais: 1` sempre — o
+    // plantão nasce pra esta pessoa, não é uma vaga extra pra outros pegarem.
+    // Se marcar_extra rejeitar mais abaixo, o ROLLBACK desfaz a criação junto.
+    let plantaoId: string;
+    if (params.novoPlantao) {
+      const novoPlantao = params.novoPlantao;
+      const plantaoCriado = await criarPlantao(
+        tx,
+        {
+          cicloId: novoPlantao.cicloId,
+          rtId: novoPlantao.rtId,
+          data: novoPlantao.data,
+          tipo: novoPlantao.tipo,
+          horaInicio: novoPlantao.horaInicio,
+          horaFim: novoPlantao.horaFim,
+          vagasTotais: 1,
+          permiteCruzada: novoPlantao.permiteCruzada,
+          observacao: 'Criado exclusivamente para esta marcação manual (admin).',
+        },
+        { atorId: params.adminId, ip: params.ip, userAgent: params.userAgent, requestId: params.requestId },
+      );
+      plantaoId = plantaoCriado.id;
+    } else if (params.plantaoId) {
+      plantaoId = params.plantaoId;
+    } else {
+      throw erroInterno(new Error('marcarExtraAdmin: nem plantaoId nem novoPlantao foram informados.'));
+    }
+
     // 1. marcar_extra (FN-005), origem ADMIN — pula só a checagem de janela
     // (RN-27), toda outra regra continua valendo dentro da função (SEC-ACID:
     // advisory lock + FOR UPDATE, nenhum atalho de aplicação).
     const linhasMarcacao = await tx.$queryRaw<LinhaMarcarExtra[]>`
       SELECT id, cruzada FROM marcar_extra(
-        ${params.plantaoId}::uuid, ${params.colaboradorId}::uuid,
+        ${plantaoId}::uuid, ${params.colaboradorId}::uuid,
         'ADMIN'::origem_marcacao, ${params.ip}, ${params.userAgent}
       )
     `;
@@ -258,7 +314,7 @@ export async function marcarExtraAdmin(prisma: ClienteBanco, params: MarcarExtra
     await tx.$executeRaw`UPDATE marcacao SET motivo = ${params.motivo} WHERE id = ${marcacao.id}::uuid`;
 
     const plantao = await tx.plantao.findUniqueOrThrow({
-      where: { id: params.plantaoId },
+      where: { id: plantaoId },
       select: { id: true, data: true, tipo: true, cicloId: true, rt: { select: { nome: true } } },
     });
 
@@ -275,7 +331,13 @@ export async function marcarExtraAdmin(prisma: ClienteBanco, params: MarcarExtra
       acao: 'EXTRA_MARCADA',
       entidade: 'marcacao',
       entidadeId: marcacao.id,
-      payload: { origem: 'ADMIN', motivo: params.motivo, plantaoId: params.plantaoId, colaboradorId: params.colaboradorId },
+      payload: {
+        origem: 'ADMIN',
+        motivo: params.motivo,
+        plantaoId,
+        colaboradorId: params.colaboradorId,
+        plantaoCriadoParaEstaMarcacao: params.novoPlantao !== undefined,
+      },
       ip: params.ip,
       userAgent: params.userAgent,
       requestId: params.requestId,

@@ -15,7 +15,7 @@
 import type { PrismaClient } from '@prisma/client';
 import { calcularEstadoJanela } from './ciclo-atual';
 
-export type ClienteMinhasMarcacoes = Pick<PrismaClient, 'marcacao' | 'ciclo'>;
+export type ClienteMinhasMarcacoes = Pick<PrismaClient, 'marcacao' | 'ciclo' | 'solicitacaoCancelamento'>;
 
 export interface MarcacaoHistorico {
   id: string;
@@ -28,7 +28,10 @@ export interface MarcacaoHistorico {
   cruzada: boolean;
   criadoEm: string;
   canceladoEm: string | null;
+  /** Pode ABRIR um pedido de cancelamento (não cancela mais direto — pedido do usuário). `false` quando já há um pedido `PENDENTE`. */
   podeCancelar: boolean;
+  /** Já existe um pedido de cancelamento aguardando um admin decidir. */
+  cancelamentoPendente: boolean;
 }
 
 export interface MinhasMarcacoesResposta {
@@ -74,10 +77,25 @@ export async function buscarMinhasMarcacoes(
     },
   });
 
-  // Ciclo inexistente ou sem nenhuma marcação: nunca é possível cancelar
-  // (não há janela conhecida) — mesma regra vale se o ciclo já foi FECHADO.
+  // Ciclo inexistente ou sem nenhuma marcação: nunca é possível pedir
+  // cancelamento (não há janela conhecida) — mesma regra vale se o ciclo já
+  // foi FECHADO.
   const estadoJanela = ciclo ? calcularEstadoJanela(ciclo.aberturaMarcacao, ciclo.fechamentoMarcacao, agora) : 'ENCERRADA';
   const cicloFechado = !ciclo || ciclo.status === 'FECHADO';
+
+  // Pedido do usuário: colaborador não cancela mais direto, abre um pedido —
+  // uma marcação com pedido `PENDENTE` não pode abrir outro (idempotência de
+  // UI, o índice único parcial no banco é quem garante de verdade sob
+  // concorrência).
+  const marcacaoIds = linhas.map((linha) => linha.id);
+  const pendentes =
+    marcacaoIds.length > 0
+      ? await prisma.solicitacaoCancelamento.findMany({
+          where: { marcacaoId: { in: marcacaoIds }, status: 'PENDENTE' },
+          select: { marcacaoId: true },
+        })
+      : [];
+  const marcacoesComPendente = new Set(pendentes.map((p) => p.marcacaoId));
 
   let confirmadas = 0;
   let canceladas = 0;
@@ -91,6 +109,8 @@ export async function buscarMinhasMarcacoes(
       canceladas += 1;
     }
 
+    const cancelamentoPendente = marcacoesComPendente.has(linha.id);
+
     return {
       id: linha.id,
       data: formatarData(linha.plantao.data),
@@ -102,7 +122,8 @@ export async function buscarMinhasMarcacoes(
       cruzada: linha.cruzada,
       criadoEm: linha.criadoEm.toISOString(),
       canceladoEm: linha.canceladoEm ? linha.canceladoEm.toISOString() : null,
-      podeCancelar: linha.status === 'CONFIRMADA' && !cicloFechado && estadoJanela !== 'ENCERRADA',
+      podeCancelar: linha.status === 'CONFIRMADA' && !cicloFechado && estadoJanela !== 'ENCERRADA' && !cancelamentoPendente,
+      cancelamentoPendente,
     };
   });
 

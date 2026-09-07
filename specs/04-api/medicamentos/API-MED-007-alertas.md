@@ -3,20 +3,21 @@
 - **ID:** API-MED-007
 - **Status:** RASCUNHO
 - **Ator:** Colaborador
-- **Pré-requisitos:** `FN-014`, `RNP-01`
+- **Pré-requisitos:** `FN-014`, `RNP-01`, `RNP-18`
 - **Entregáveis:** `src/app/api/medicamentos/alertas/route.ts`
 
 ## Objetivo
 
-Lista doses atrasadas da própria RT, para o badge/painel do colaborador — leitura de apoio ao
-job de notificação (`RT-003`), não substitui o job (a tela precisa funcionar mesmo se a
-notificação falhar).
+Lista doses paradas (pendentes ou separadas sem conferência) além da tolerância, da própria RT —
+para o badge/painel do colaborador. Leitura de apoio ao job de notificação (`RT-003`), não
+substitui o job (a tela precisa funcionar mesmo se a notificação falhar).
 
 ## Contrato
 
 ### Response 200
 ```ts
-Array<{ administracaoId, pacienteId, pacienteNome, medicamentoNome, horarioPrevisto, minutosAtraso }>
+Array<{ administracaoId, pacienteId, pacienteNome, medicamentoNome, horarioPrevisto,
+        etapaParada: 'PENDENTE' | 'SEPARADO', minutosAtraso }>
 ```
 
 Sem nome de medicamento **fora** desta rota autenticada — a notificação push que aponta para cá
@@ -37,6 +38,6 @@ poucos minutos e precisa parecer ao vivo.
 
 | # | Teste | Esperado |
 |---|---|---|
-| 1 | RT com 2 doses atrasadas | 2 itens |
+| 1 | RT com 1 dose `PENDENTE` atrasada e 1 `SEPARADO` sem conferência | 2 itens, `etapaParada` correta em cada |
 | 2 | RT sem atraso | lista vazia |
 | 3 | Atraso de outra RT | não aparece |

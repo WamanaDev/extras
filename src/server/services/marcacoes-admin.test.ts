@@ -38,7 +38,8 @@ interface FakeTx {
   $queryRaw: ReturnType<typeof vi.fn>;
   $executeRaw: ReturnType<typeof vi.fn>;
   marcacao: { findMany: ReturnType<typeof vi.fn>; count: ReturnType<typeof vi.fn> };
-  plantao: { findUniqueOrThrow: ReturnType<typeof vi.fn> };
+  plantao: { findUniqueOrThrow: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn> };
+  ciclo: { findUnique: ReturnType<typeof vi.fn> };
 }
 
 function sqlDaChamada(strings: TemplateStringsArray): string {
@@ -56,6 +57,8 @@ function criarTxFake(config: {
   marcacoes?: unknown[];
   totaisCount?: { total: number; confirmadas: number; canceladas: number; cruzadas: number };
   horasLinhas?: Array<{ plantao: { cargaHoras: number } }>;
+  ciclo?: Record<string, unknown> | null;
+  plantaoCriado?: Record<string, unknown>;
 }): FakeTx {
   const $queryRaw = vi.fn(async (strings: TemplateStringsArray, ..._valores: unknown[]) => {
     const sql = sqlDaChamada(strings);
@@ -99,6 +102,10 @@ function criarTxFake(config: {
     },
     plantao: {
       findUniqueOrThrow: vi.fn(async () => config.plantao ?? { id: 'plantao-1', data: new Date('2026-09-10'), tipo: 'DIURNO', cicloId: 'ciclo-1', rt: { nome: 'RT-A' } }),
+      create: vi.fn(async (args: { data: Record<string, unknown> }) => config.plantaoCriado ?? { id: 'plantao-novo-1', ...args.data }),
+    },
+    ciclo: {
+      findUnique: vi.fn(async () => (config.ciclo === undefined ? { id: 'ciclo-1', ano: 2026, mes: 9, status: 'PUBLICADO' } : config.ciclo)),
     },
   };
 }
@@ -187,6 +194,105 @@ describe('API-ADM-MAR-002 marcarExtraAdmin', () => {
     const erroPg = { meta: { code: 'P0001', message: 'ERROR:  EXCEDE_JORNADA' } };
     const tx = criarTxFake({ marcarExtraErro: erroPg });
     await expect(marcarExtraAdmin(criarPrismaFake(tx), paramsBase)).rejects.toBe(erroPg);
+  });
+
+  // --------------------------------------------------------------------------
+  // `novoPlantao` — pedido do usuário: criar um plantão de 1 vaga exclusivo
+  // pra esta marcação, na mesma transação de marcar_extra.
+  // --------------------------------------------------------------------------
+
+  const novoPlantaoBase = {
+    cicloId: 'ciclo-1',
+    rtId: 'rt-1',
+    data: new Date('2026-09-15T00:00:00.000Z'),
+    tipo: 'DIURNO' as const,
+    permiteCruzada: null,
+  };
+
+  it('novoPlantao: cria o plantão (vagasTotais=1) antes de marcar_extra, na mesma transação', async () => {
+    const tx = criarTxFake({
+      marcarExtraResultado: [{ id: 'marc-novo', cruzada: false }],
+      plantao: { id: 'plantao-novo-1', data: novoPlantaoBase.data, tipo: 'DIURNO', cicloId: 'ciclo-1', rt: { nome: 'RT-1' } },
+    });
+
+    const resultado = await marcarExtraAdmin(criarPrismaFake(tx), {
+      novoPlantao: novoPlantaoBase,
+      colaboradorId: 'colab-1',
+      motivo: 'Cobertura extra criada na hora',
+      adminId: 'admin-1',
+      ip: '203.0.113.1',
+      userAgent: 'vitest',
+      requestId: 'req-1',
+    });
+
+    expect(tx.plantao.create).toHaveBeenCalledTimes(1);
+    const dadosCriados = (tx.plantao.create.mock.calls[0]![0] as { data: Record<string, unknown> }).data;
+    expect(dadosCriados).toMatchObject({ cicloId: 'ciclo-1', rtId: 'rt-1', tipo: 'DIURNO', vagasTotais: 1 });
+
+    // marcar_extra é chamado com o id do plantão RECÉM-CRIADO, não um plantaoId do body.
+    const chamadaMarcar = tx.$queryRaw.mock.calls.find((c) => sqlDaChamada(c[0] as TemplateStringsArray).includes('marcar_extra'));
+    expect(chamadaMarcar?.slice(1)).toContain('plantao-novo-1');
+    expect(resultado.plantaoId).toBe('plantao-novo-1');
+  });
+
+  it('novoPlantao: se marcar_extra rejeitar depois, a criação do plantão é desfeita junto (mesma transação, ROLLBACK)', async () => {
+    const erroPg = { meta: { code: 'P0001', message: 'ERROR:  EM_AUSENCIA' } };
+    const tx = criarTxFake({ marcarExtraErro: erroPg });
+
+    await expect(
+      marcarExtraAdmin(criarPrismaFake(tx), {
+        novoPlantao: novoPlantaoBase,
+        colaboradorId: 'colab-1',
+        motivo: 'Tentativa que vai falhar',
+        adminId: 'admin-1',
+        ip: '203.0.113.1',
+        userAgent: 'vitest',
+        requestId: 'req-1',
+      }),
+    ).rejects.toBe(erroPg);
+
+    // O fake não modela rollback de verdade (é uma função só, sem side-effect
+    // persistente) — o que garante a atomicidade de verdade é `emTransacao`
+    // (Prisma `$transaction`, já coberto em `db/tx.test.ts`); aqui confirmamos
+    // só que a criação aconteceu ANTES da falha, dentro do mesmo `tx`.
+    expect(tx.plantao.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('novoPlantao: erro de criarPlantao (ex.: CICLO_FECHADO) propaga intacto, marcar_extra nunca é chamado', async () => {
+    const tx = criarTxFake({ ciclo: { id: 'ciclo-1', ano: 2026, mes: 9, status: 'FECHADO' } });
+
+    await expect(
+      marcarExtraAdmin(criarPrismaFake(tx), {
+        novoPlantao: novoPlantaoBase,
+        colaboradorId: 'colab-1',
+        motivo: 'Não deveria chegar aqui',
+        adminId: 'admin-1',
+        ip: '203.0.113.1',
+        userAgent: 'vitest',
+        requestId: 'req-1',
+      }),
+    ).rejects.toMatchObject({ status: 409, codigo: 'CICLO_FECHADO' });
+
+    const chamadaMarcar = tx.$queryRaw.mock.calls.find((c) => sqlDaChamada(c[0] as TemplateStringsArray).includes('marcar_extra'));
+    expect(chamadaMarcar).toBeUndefined();
+  });
+
+  it('auditoria de novoPlantao marca `plantaoCriadoParaEstaMarcacao: true` no payload de EXTRA_MARCADA', async () => {
+    const tx = criarTxFake({});
+
+    await marcarExtraAdmin(criarPrismaFake(tx), {
+      novoPlantao: novoPlantaoBase,
+      colaboradorId: 'colab-1',
+      motivo: 'Cobertura extra criada na hora',
+      adminId: 'admin-1',
+      ip: '203.0.113.1',
+      userAgent: 'vitest',
+      requestId: 'req-1',
+    });
+
+    const chamadaExtraMarcada = vi.mocked(registrarAuditoria).mock.calls.find(([, evento]) => evento.acao === 'EXTRA_MARCADA');
+    expect(chamadaExtraMarcada).toBeDefined();
+    expect((chamadaExtraMarcada![1].payload as { plantaoCriadoParaEstaMarcacao: boolean }).plantaoCriadoParaEstaMarcacao).toBe(true);
   });
 });
 

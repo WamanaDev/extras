@@ -72,8 +72,7 @@ export default async function MinhaEscalaCalendarioPage(): Promise<JSX.Element> 
       </Suspense>
 
       <CalendarioEscalaClient
-        ano={ciclo.ano}
-        mes={ciclo.mes}
+        cicloInicial={ciclo}
         escala={escalaResultado.dados}
         {...(marcacoesResultado.ok ? { marcacoes: marcacoesResultado.dados } : {})}
       />

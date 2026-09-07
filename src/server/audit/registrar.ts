@@ -75,7 +75,16 @@ export type AcaoAuditoria =
    * spec de API própria ainda. Extensão aditiva, mesmo padrão de
    * `CODIGO_ESCALA_*` acima. Ver `_conflitos.md`.
    */
-  | 'NOTIFICACAO_ENVIADA';
+  | 'NOTIFICACAO_ENVIADA'
+  /**
+   * Fluxo de solicitação de cancelamento de extra (colaborador não cancela
+   * mais direto — pede, qualquer admin aprova ou recusa) — pedido do
+   * usuário, sem spec de API própria ainda. Extensão aditiva, mesmo padrão
+   * de `NOTIFICACAO_ENVIADA`/`CODIGO_ESCALA_*` acima. Ver `_conflitos.md`.
+   */
+  | 'CANCELAMENTO_SOLICITADO'
+  | 'CANCELAMENTO_APROVADO'
+  | 'CANCELAMENTO_RECUSADO';
 
 export interface EventoAuditoria {
   atorTipo: AtorTipo;

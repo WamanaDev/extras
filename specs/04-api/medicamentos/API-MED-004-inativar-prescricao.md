@@ -2,14 +2,16 @@
 
 - **ID:** API-MED-004
 - **Status:** RASCUNHO
-- **Ator:** Admin
+- **Ator:** Colaborador (da RT do paciente) ou admin
 - **Pré-requisitos:** `API-MED-002`, `RNP-19`
 - **Entregáveis:** `src/app/api/prescricoes/[id]/encerrar/route.ts`
 
 ## Objetivo
 
-Suspende ou encerra prescrição (`RNP-19`). Diferença: `SUSPENSA` pode ser reativada pelo mesmo
-registro; `ENCERRADA` é definitivo (fim de tratamento).
+Suspende ou encerra prescrição (`RNP-19`) — inclusive uma `DEFINITIVA`, quando o médico
+descontinua o uso contínuo. `SUSPENSA` pode ser reativada pelo mesmo registro; `ENCERRADA` é
+definitivo (fim de tratamento). Uma `TEMPORARIA` também encerra sozinha ao passar de `dataFim`
+(job periódico, fora do escopo desta rota) — esta rota cobre o encerramento manual antecipado.
 
 ## Contrato
 
@@ -24,16 +26,18 @@ Prescrição atualizada.
 ## Fluxo
 
 1. `UPDATE prescricao SET status = :novoStatus`
-2. Cancelar (não apagar) todas as `administracao_medicamento` `PENDENTE` com
-   `horario_previsto > now()` da prescrição — marcar `status = NAO_ADMINISTRADO`
-3. Administrações passadas (já `ADMINISTRADO`/`RECUSADO`/`PENDENTE` vencida) não são tocadas
-   (`RNP-19`)
-4. Auditar `PRESCRICAO_ENCERRADA`/`PRESCRICAO_SUSPENSA`
+2. Doses futuras `PENDENTE` (`horario_previsto > now()`) da prescrição → `NAO_ADMINISTRADO`
+3. Doses em andamento (`SEPARADO`/`CONFERIDO`) na hora do encerramento **não** são canceladas
+   automaticamente — seguem até o fim do ciclo de checagem ou são descartadas manualmente com
+   nota, porque a dose já foi fisicamente separada (`RNP-19`)
+4. Doses passadas já resolvidas (`ADMINISTRADO`/`RECUSADO`/`DIVERGENTE`) não são tocadas
+5. Auditar `PRESCRICAO_ENCERRADA`/`PRESCRICAO_SUSPENSA`
 
 ## Testes de aceitação
 
 | # | Teste | Esperado |
 |---|---|---|
 | 1 | Encerrar com doses futuras `PENDENTE` | viram `NAO_ADMINISTRADO` |
-| 2 | Doses passadas já administradas | não mudam |
-| 3 | Sem motivo | 422 |
+| 2 | Encerrar com dose `SEPARADO` no momento | dose não é tocada automaticamente |
+| 3 | Doses passadas já administradas | não mudam |
+| 4 | Sem motivo | 422 |

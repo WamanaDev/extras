@@ -11,6 +11,7 @@ const ITENS_NAV = [
   { href: '/admin', rotulo: 'Painel' },
   { href: '/admin/ciclos', rotulo: 'Ciclos' },
   { href: '/admin/colaboradores', rotulo: 'Colaboradores' },
+  { href: '/admin/solicitacoes-cancelamento', rotulo: 'Cancelamentos' },
   { href: '/admin/notificacoes', rotulo: 'Notificações' },
   { href: '/admin/relatorios', rotulo: 'Relatórios' },
   { href: '/admin/auditoria', rotulo: 'Auditoria' },

@@ -18,7 +18,8 @@ saber o que dar, quando, e a dose.
 
 ### Response 200
 ```ts
-Array<{ id, medicamentoNome, dose, via, tipo, horarios, dataInicio, dataFim, instrucoes, status }>
+Array<{ id, medicamentoNome, dose, via, tipo, duracao, horarios, dataInicio, dataFim,
+        instrucoes, status, criadoPorNome }>
 ```
 
 ### Erros

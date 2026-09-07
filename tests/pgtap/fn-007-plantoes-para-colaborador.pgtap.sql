@@ -49,7 +49,7 @@
 -- ============================================================================
 
 BEGIN;
-SELECT plan(17);
+SELECT plan(19);
 
 SET LOCAL TIME ZONE 'America/Sao_Paulo';
 
@@ -331,6 +331,42 @@ SELECT throws_ok(
                           '00000000-0000-0000-0000-000000070601'::uuid) $$,
   'EXCEDE_JORNADA',
   'F7-8b: marcar_extra lança o MESMO código (EXCEDE_JORNADA) para o mesmo par'
+);
+
+-- ----------------------------------------------------------------------------
+-- F7-8c: RN-16 estendida (pedido do usuário, ver 20260906130000_fn005_fn007_
+-- ausencia_turno_seguinte). Colaborador NOTURNO com folga (F) em 2026-09-20;
+-- plantão-extra NOTURNO em 2026-09-19 "termina" na madrugada do dia de folga
+-- → plantoes_para_colaborador precisa relatar EM_AUSENCIA, e marcar_extra
+-- precisa lançar o mesmo código para o mesmo par (mesma garantia de
+-- convergência de F7-8a/b, agora para o motivo novo).
+-- ----------------------------------------------------------------------------
+INSERT INTO colaborador (id, matricula, nome, cpf_hash, cpf_ultimos4, rt_id, turno_padrao, escala_ancora)
+  VALUES ('00000000-0000-0000-0000-000000070a01', 'MAT9708', 'Colaborador F7-8c', 'hash9708', '9708',
+          '00000000-0000-0000-0000-000000070001', 'NOTURNO', '2026-01-01');
+
+INSERT INTO escala_dia (id, colaborador_id, ciclo_id, codigo_escala_id, data, hora_inicio, hora_fim)
+  VALUES ('00000000-0000-0000-0000-000000070a02', '00000000-0000-0000-0000-000000070a01',
+          '00000000-0000-0000-0000-000000070005', '00000000-0000-0000-0000-000000070004',
+          '2026-09-20', '19:00', '07:00');
+
+INSERT INTO plantao (id, ciclo_id, rt_id, data, tipo, hora_inicio, hora_fim, carga_horas, vagas_totais)
+  VALUES ('00000000-0000-0000-0000-000000070a03', '00000000-0000-0000-0000-000000070005',
+          '00000000-0000-0000-0000-000000070001', '2026-09-19', 'NOTURNO', '19:00', '07:00', 12, 5);
+
+SELECT is(
+  (SELECT motivo FROM plantoes_para_colaborador(
+     '00000000-0000-0000-0000-000000070005', '00000000-0000-0000-0000-000000070a01')
+   WHERE plantao_id = '00000000-0000-0000-0000-000000070a03'),
+  'EM_AUSENCIA',
+  'F7-8c (setup): plantoes_para_colaborador relata EM_AUSENCIA para extra NOTURNA na véspera de um F'
+);
+
+SELECT throws_ok(
+  $$ SELECT marcar_extra('00000000-0000-0000-0000-000000070a03'::uuid,
+                          '00000000-0000-0000-0000-000000070a01'::uuid) $$,
+  'EM_AUSENCIA',
+  'F7-8c: marcar_extra lança o MESMO código (EM_AUSENCIA) para o mesmo par'
 );
 
 -- ----------------------------------------------------------------------------

@@ -17,7 +17,10 @@ qualquer uma.
 | `agendamento:criado` | `{ agendamentoId, pacienteId, tipo, inicioEm }` | colaboradores da RT do agendamento |
 | `agendamento:atualizado` | `{ agendamentoId, campos: string[] }` | idem |
 | `agendamento:cancelado` | `{ agendamentoId }` | idem |
-| `medicacao:dose-atrasada` | `{ administracaoId, pacienteId }` — **sem** nome de medicamento | idem |
+| `medicacao:separada` | `{ administracaoId, pacienteId }` | idem — sinaliza que a dose está pronta para conferência |
+| `medicacao:conferida` | `{ administracaoId, pacienteId }` | idem |
+| `medicacao:divergente` | `{ administracaoId, pacienteId }` — **sem** nome de medicamento nem observação | idem — sinaliza que precisa de nova separação |
+| `medicacao:dose-atrasada` | `{ administracaoId, pacienteId, etapaParada }` — **sem** nome de medicamento | idem |
 | `medicacao:administrada` | `{ administracaoId, pacienteId }` | idem |
 
 ## Por que nada em Postgres Changes
@@ -39,7 +42,14 @@ Este módulo é o primeiro a povoá-las:
 ## Regra de refetch
 
 Igual a `RT-001`: ao receber qualquer evento do canal, o cliente refaz o fetch de `API-AGE-001`
-ou `API-MED-006`/`API-MED-007`, com debounce de 500 ms. Nenhum estado é recalculado localmente.
+ou `API-MED-006`/`API-MED-007`, com debounce de 500 ms. Nenhum estado é recalculado localmente —
+em especial, o cliente **nunca** decide sozinho se pode mostrar o botão de conferir/administrar;
+isso vem de quem está de fato gravado como `separado_por_id`/`conferido_por_id` no refetch
+(`RNP-26`, `RNP-27`, `FE-001.5`).
+
+`medicacao:separada` é o gatilho para o painel de "doses aguardando conferência" atualizar sem
+que o segundo colaborador precise recarregar a página manualmente — é o ponto do fluxo em que
+duas pessoas diferentes, possivelmente em telas diferentes, precisam ver o mesmo estado rápido.
 
 ## Broadcast só após commit
 

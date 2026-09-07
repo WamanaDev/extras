@@ -20,6 +20,7 @@ const dadosBase: MinhasMarcacoesDados = {
       criadoEm: '2026-01-01T00:00:00-03:00',
       canceladoEm: null,
       podeCancelar: true,
+      cancelamentoPendente: false,
     },
     {
       id: 'm2',
@@ -33,6 +34,7 @@ const dadosBase: MinhasMarcacoesDados = {
       criadoEm: '2026-01-01T00:00:00-03:00',
       canceladoEm: '2026-01-01T10:00:00-03:00',
       podeCancelar: false,
+      cancelamentoPendente: false,
     },
   ],
   totais: { confirmadas: 1, canceladas: 1, horas: 12 },
@@ -56,7 +58,17 @@ describe('<MinhasExtrasClient /> — API-COL-005/006', () => {
     expect(screen.getAllByRole('button', { name: /cancelar/i })).toHaveLength(1);
   });
 
-  it('cancelamento exige confirmação com o impacto listado antes do DELETE (FE-001.6)', async () => {
+  it('marcação com cancelamento pendente mostra o badge, nunca o botão (pedido do usuário)', () => {
+    const dados: MinhasMarcacoesDados = {
+      ...dadosBase,
+      marcacoes: [{ ...dadosBase.marcacoes[0]!, podeCancelar: false, cancelamentoPendente: true }, dadosBase.marcacoes[1]!],
+    };
+    render(<MinhasExtrasClient cicloId="ciclo-1" dadosIniciais={dados} />);
+    expect(screen.getByText('Cancelamento em análise')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^cancelar$/i })).not.toBeInTheDocument();
+  });
+
+  it('pedido de cancelamento exige motivo preenchido antes de enviar — DELETE só depois, com o motivo no corpo', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch');
     render(<MinhasExtrasClient cicloId="ciclo-1" dadosIniciais={dadosBase} />);
 
@@ -64,37 +76,43 @@ describe('<MinhasExtrasClient /> — API-COL-005/006', () => {
 
     const dialogo = await screen.findByRole('dialog', { hidden: true });
     expect(dialogo).toHaveTextContent('2026-01-10');
-    const confirmar = screen.getByRole('button', { name: /confirmar mesmo assim/i });
-    expect(confirmar).toBeDisabled();
+    const enviar = screen.getByRole('button', { name: /enviar pedido/i });
+    expect(enviar).toBeDisabled();
     expect(fetchMock).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('checkbox', { name: /li e entendo/i }));
-    expect(confirmar).toBeEnabled();
+    fireEvent.change(screen.getByLabelText(/motivo do cancelamento/i), { target: { value: 'Imprevisto pessoal' } });
+    expect(enviar).toBeEnabled();
 
-    fetchMock.mockResolvedValueOnce(jsonResponse(200, { id: 'm1', status: 'CANCELADA' }));
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { id: 'sol-1', marcacaoId: 'm1', status: 'PENDENTE', jaExistia: false }));
     fetchMock.mockResolvedValueOnce(
       jsonResponse(200, {
-        marcacoes: [{ ...dadosBase.marcacoes[0]!, status: 'CANCELADA', podeCancelar: false }, dadosBase.marcacoes[1]!],
-        totais: { confirmadas: 0, canceladas: 2, horas: 12 },
+        marcacoes: [{ ...dadosBase.marcacoes[0]!, podeCancelar: false, cancelamentoPendente: true }, dadosBase.marcacoes[1]!],
+        totais: { confirmadas: 1, canceladas: 1, horas: 12 },
       }),
     );
 
-    fireEvent.click(confirmar);
+    fireEvent.click(enviar);
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/marcacoes/m1', expect.objectContaining({ method: 'DELETE' })));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/marcacoes/m1',
+        expect.objectContaining({ method: 'DELETE', body: JSON.stringify({ motivo: 'Imprevisto pessoal' }) }),
+      ),
+    );
+    expect(await screen.findByText(/pedido de cancelamento enviado/i)).toBeInTheDocument();
   });
 
-  it('erro de negócio no cancelamento (409) fica inline, não fecha o modal silenciosamente (FE-001.4)', async () => {
+  it('erro de negócio no pedido (409) fica inline, não fecha o modal silenciosamente (FE-001.4)', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(409, { erro: 'JANELA_ENCERRADA', mensagem: 'A janela deste ciclo já encerrou.', detalhes: null, requestId: 'r' }),
+      jsonResponse(409, { erro: 'REGRA_DE_NEGOCIO', mensagem: 'Este ciclo já está fechado — não é possível pedir cancelamento.', detalhes: null, requestId: 'r' }),
     );
 
     render(<MinhasExtrasClient cicloId="ciclo-1" dadosIniciais={dadosBase} />);
     fireEvent.click(screen.getByRole('button', { name: /cancelar/i }));
-    fireEvent.click(screen.getByRole('checkbox', { name: /li e entendo/i }));
-    fireEvent.click(screen.getByRole('button', { name: /confirmar mesmo assim/i }));
+    fireEvent.change(screen.getByLabelText(/motivo do cancelamento/i), { target: { value: 'Imprevisto pessoal' } });
+    fireEvent.click(screen.getByRole('button', { name: /enviar pedido/i }));
 
-    expect(await screen.findByText('A janela deste ciclo já encerrou.')).toBeInTheDocument();
+    expect(await screen.findByText('Este ciclo já está fechado — não é possível pedir cancelamento.')).toBeInTheDocument();
   });
 
   it('estado vazio quando não há marcações', async () => {

@@ -32,6 +32,7 @@ const linhaCancelada = {
 function criarPrismaFake(config: {
   ciclo?: { status: string; aberturaMarcacao: Date | null; fechamentoMarcacao: Date | null } | null;
   marcacoes?: unknown[];
+  pendentes?: Array<{ marcacaoId: string }>;
 }): ClienteMinhasMarcacoes {
   return {
     ciclo: {
@@ -45,6 +46,9 @@ function criarPrismaFake(config: {
     marcacao: {
       findMany: vi.fn(async () => config.marcacoes ?? [linhaConfirmada]),
     } as unknown as ClienteMinhasMarcacoes['marcacao'],
+    solicitacaoCancelamento: {
+      findMany: vi.fn(async () => config.pendentes ?? []),
+    } as unknown as ClienteMinhasMarcacoes['solicitacaoCancelamento'],
   };
 }
 
@@ -104,5 +108,30 @@ describe('API-COL-006 buscarMinhasMarcacoes', () => {
     const resultado = await buscarMinhasMarcacoes(prisma, 'colab-1', 'ciclo-1', AGORA);
     expect(resultado.marcacoes).toEqual([]);
     expect(resultado.totais).toEqual({ confirmadas: 0, canceladas: 0, horas: 0 });
+  });
+
+  // --------------------------------------------------------------------------
+  // Pedido do usuário: colaborador não cancela mais direto — `podeCancelar`
+  // agora também considera se já existe um pedido `PENDENTE`.
+  // --------------------------------------------------------------------------
+
+  it('marcação com pedido de cancelamento PENDENTE → podeCancelar = false, cancelamentoPendente = true', async () => {
+    const prisma = criarPrismaFake({ marcacoes: [linhaConfirmada], pendentes: [{ marcacaoId: 'marc-1' }] });
+    const resultado = await buscarMinhasMarcacoes(prisma, 'colab-1', 'ciclo-1', AGORA);
+    expect(resultado.marcacoes[0]!.podeCancelar).toBe(false);
+    expect(resultado.marcacoes[0]!.cancelamentoPendente).toBe(true);
+  });
+
+  it('marcação sem pedido pendente → cancelamentoPendente = false, podeCancelar segue as outras regras', async () => {
+    const prisma = criarPrismaFake({ marcacoes: [linhaConfirmada], pendentes: [] });
+    const resultado = await buscarMinhasMarcacoes(prisma, 'colab-1', 'ciclo-1', AGORA);
+    expect(resultado.marcacoes[0]!.cancelamentoPendente).toBe(false);
+    expect(resultado.marcacoes[0]!.podeCancelar).toBe(true);
+  });
+
+  it('sem nenhuma marcação, nunca consulta solicitacaoCancelamento (evita IN () vazio)', async () => {
+    const prisma = criarPrismaFake({ marcacoes: [] });
+    await buscarMinhasMarcacoes(prisma, 'colab-1', 'ciclo-1', AGORA);
+    expect(prisma.solicitacaoCancelamento.findMany).not.toHaveBeenCalled();
   });
 });

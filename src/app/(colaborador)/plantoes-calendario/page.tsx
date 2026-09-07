@@ -61,9 +61,7 @@ export default async function PlantoesCalendarioPage(): Promise<JSX.Element> {
       </section>
 
       <CalendarioPlantoesClient
-        cicloId={ciclo.id}
-        ano={ciclo.ano}
-        mes={ciclo.mes}
+        cicloInicial={ciclo}
         {...(dadosResultado.ok ? { dadosIniciais: dadosResultado.dados } : {})}
         {...(saldoResultado.ok ? { saldoInicial: saldoResultado.dados } : {})}
       />

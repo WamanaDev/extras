@@ -11,11 +11,21 @@
  * Diferente de `<CalendarioPlantoesClient />`: aqui os dados não mudam em
  * tempo real (a escala é estável dentro do ciclo), então não há
  * `usePlantoesRealtime` nem botão de atualização manual — só apresentação.
+ *
+ * Navegação entre meses (pedido do usuário): mesmo padrão de
+ * `<CalendarioPlantoesClient />` — `useNavegacaoCiclos` resolve qual ciclo
+ * mostrar (só `PUBLICADO`, nunca `FECHADO` — "ciclo cancelado" nas palavras
+ * do usuário), e os dados de cada ciclo (`/api/minha-escala` +
+ * `/api/minhas-marcacoes`) são cacheados por `cicloId`: assim que a
+ * navegação revela um vizinho, seus dados já são buscados em segundo plano,
+ * pra nunca mostrar tela de carregando ao trocar de mês.
  */
-import { useMemo, useState } from 'react';
-import { CalendarDays, Clock } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { CalendarDays, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { get } from '@/lib/api/client';
 import { Badge } from '@/components/ui/badge';
+import { useNavegacaoCiclos, type CicloResumo } from '@/hooks/useNavegacaoCiclos';
 
 const NOMES_DIA_SEMANA = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 const NOMES_MES = [
@@ -54,6 +64,11 @@ export interface MarcacaoHistorico {
 export interface MinhasMarcacoesResposta {
   marcacoes: MarcacaoHistorico[];
   totais: { confirmadas: number; canceladas: number; horas: number };
+}
+
+interface DadosCiclo {
+  escala: MinhaEscala;
+  marcacoes?: MinhasMarcacoesResposta;
 }
 
 interface CelulaCalendario {
@@ -118,26 +133,66 @@ const ESTILO_CELULA: Record<CategoriaDia, { ativo: string; padrao: string; ponto
 };
 
 export interface CalendarioEscalaClientProps {
-  ano: number;
-  mes: number;
+  cicloInicial: CicloResumo;
   escala: MinhaEscala;
   marcacoes?: MinhasMarcacoesResposta;
 }
 
-export function CalendarioEscalaClient({ ano, mes, escala, marcacoes }: CalendarioEscalaClientProps): JSX.Element {
+export function CalendarioEscalaClient({ cicloInicial, escala, marcacoes }: CalendarioEscalaClientProps): JSX.Element {
+  const nav = useNavegacaoCiclos(cicloInicial);
+  const cicloId = nav.atual.id;
+  const ano = nav.atual.ano;
+  const mes = nav.atual.mes;
+
+  const [cache, setCache] = useState<Record<string, DadosCiclo>>(() => ({
+    [cicloInicial.id]: { escala, ...(marcacoes ? { marcacoes } : {}) },
+  }));
+  const [erroCarga, setErroCarga] = useState<string | null>(null);
   const [diaSelecionado, setDiaSelecionado] = useState<string | null>(null);
+
+  const dadosCiclo = cache[cicloId] ?? null;
+  const carregando = dadosCiclo === null;
+
+  const buscarCiclo = useCallback(async (idAlvo: string): Promise<void> => {
+    const [escalaResultado, marcacoesResultado] = await Promise.all([
+      get<MinhaEscala>(`/api/minha-escala?cicloId=${encodeURIComponent(idAlvo)}`),
+      get<MinhasMarcacoesResposta>(`/api/minhas-marcacoes?cicloId=${encodeURIComponent(idAlvo)}`),
+    ]);
+    if (escalaResultado.ok) {
+      setCache((atual) => ({
+        ...atual,
+        [idAlvo]: { escala: escalaResultado.dados, ...(marcacoesResultado.ok ? { marcacoes: marcacoesResultado.dados } : {}) },
+      }));
+    } else if (idAlvo === cicloId) {
+      setErroCarga(escalaResultado.erro.mensagem);
+    }
+  }, [cicloId]);
+
+  // Pré-busca os vizinhos assim que a navegação os revela — mesma estratégia
+  // de `<CalendarioPlantoesClient />` (pedido do usuário: nunca mostrar tela
+  // de carregando ao trocar de mês).
+  useEffect(() => {
+    if (!cache[cicloId]) void buscarCiclo(cicloId);
+    if (nav.anterior && !cache[nav.anterior.id]) void buscarCiclo(nav.anterior.id);
+    if (nav.proximo && !cache[nav.proximo.id]) void buscarCiclo(nav.proximo.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `cache` de propósito fora das deps: só usado para decidir "já tenho isso?", incluí-lo causaria loop (o próprio efeito escreve em `cache`).
+  }, [cicloId, nav.anterior, nav.proximo, buscarCiclo]);
+
+  useEffect(() => {
+    setDiaSelecionado(null);
+  }, [cicloId]);
 
   const porDia = useMemo(() => {
     const mapa = new Map<string, DiaEscala>();
-    for (const dia of escala.dias) mapa.set(dia.data, dia);
+    for (const dia of dadosCiclo?.escala.dias ?? []) mapa.set(dia.data, dia);
     return mapa;
-  }, [escala.dias]);
+  }, [dadosCiclo]);
 
   const celulas = useMemo(() => montarGrade(ano, mes), [ano, mes]);
 
   const extrasConfirmadas = useMemo(
-    () => marcacoes?.marcacoes.filter((m) => m.status === 'CONFIRMADA') ?? [],
-    [marcacoes],
+    () => dadosCiclo?.marcacoes?.marcacoes.filter((m) => m.status === 'CONFIRMADA') ?? [],
+    [dadosCiclo],
   );
 
   // Por data, pra completar dias sem `escala_dia` própria — ver docstring de `categoriaDoDia`.
@@ -147,37 +202,78 @@ export function CalendarioEscalaClient({ ano, mes, escala, marcacoes }: Calendar
     return mapa;
   }, [extrasConfirmadas]);
 
-  const diaAtivo = diaSelecionado ?? escala.dias[0]?.data ?? extrasConfirmadas[0]?.data ?? null;
+  const dias = dadosCiclo?.escala.dias ?? [];
+  const diaAtivo = diaSelecionado ?? dias[0]?.data ?? extrasConfirmadas[0]?.data ?? null;
   const detalheDia = diaAtivo ? porDia.get(diaAtivo) ?? null : null;
   const marcacaoDoDiaAtivo = diaAtivo ? marcacaoPorDia.get(diaAtivo) ?? null : null;
+
+  if (!dadosCiclo && erroCarga) {
+    return (
+      <div role="alert" className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-900">
+        {erroCarga}
+      </div>
+    );
+  }
+
+  if (carregando) {
+    return (
+      <div role="status" aria-live="polite" className="rounded-lg border border-slate-200 bg-white p-4">
+        Carregando calendário de escala…
+      </div>
+    );
+  }
+
+  const totais = dadosCiclo.escala.totais;
 
   return (
     <div className="space-y-6">
       <dl className="flex flex-wrap gap-4 text-sm text-slate-600">
         <div>
           <dt className="inline font-medium text-slate-900">Escalados: </dt>
-          <dd className="inline">{escala.totais.escalados}</dd>
+          <dd className="inline">{totais.escalados}</dd>
         </div>
         <div>
           <dt className="inline font-medium text-slate-900">Extras: </dt>
-          <dd className="inline">{escala.totais.extras}</dd>
+          <dd className="inline">{totais.extras}</dd>
         </div>
         <div>
           <dt className="inline font-medium text-slate-900">Horas: </dt>
-          <dd className="inline">{escala.totais.horas}h</dd>
+          <dd className="inline">{totais.horas}h</dd>
         </div>
       </dl>
 
-      {escala.dias.length === 0 ? (
+      {dias.length === 0 ? (
         <div role="status" className="rounded-lg border border-slate-200 bg-white p-6 text-slate-600">
           Sua escala ainda não foi gerada para este ciclo.
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
-            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
-              <CalendarDays className="h-4 w-4 text-slate-500" aria-hidden="true" />
-              {NOMES_MES[mes - 1]} {ano}
+            <div className="mb-3 flex items-center justify-between gap-2 text-sm font-semibold text-slate-900">
+              <div className="flex items-center gap-2">
+                <CalendarDays className="h-4 w-4 text-slate-500" aria-hidden="true" />
+                {NOMES_MES[mes - 1]} {ano}
+              </div>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={nav.irParaAnterior}
+                  disabled={!nav.anterior}
+                  title={nav.anterior ? `Ir para ${NOMES_MES[nav.anterior.mes - 1]} ${nav.anterior.ano}` : 'Nenhum ciclo publicado anterior'}
+                  className="rounded-full p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:pointer-events-none disabled:opacity-30"
+                >
+                  <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  onClick={nav.irParaProximo}
+                  disabled={!nav.proximo}
+                  title={nav.proximo ? `Ir para ${NOMES_MES[nav.proximo.mes - 1]} ${nav.proximo.ano}` : 'Nenhum ciclo publicado seguinte'}
+                  className="rounded-full p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:pointer-events-none disabled:opacity-30"
+                >
+                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-medium text-slate-400">

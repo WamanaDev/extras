@@ -49,10 +49,11 @@ interface FormularioLote {
   ate: string;
   tipos: Array<'DIURNO' | 'NOTURNO'>;
   vagasTotais: number;
+  paridade: 'AMBOS' | 'PAR' | 'IMPAR';
 }
 
 export function GeradorLote({ cicloId, rts }: GeradorLoteProps): JSX.Element {
-  const [form, setForm] = useState<FormularioLote>({ rtIds: [], de: '', ate: '', tipos: [], vagasTotais: 1 });
+  const [form, setForm] = useState<FormularioLote>({ rtIds: [], de: '', ate: '', tipos: [], vagasTotais: 1, paridade: 'AMBOS' });
   const [preview, setPreview] = useState<RespostaLote | null>(null);
   const [previewValidoPara, setPreviewValidoPara] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
@@ -89,6 +90,7 @@ export function GeradorLote({ cicloId, rts }: GeradorLoteProps): JSX.Element {
       ate: form.ate,
       tipos: form.tipos,
       vagasTotais: form.vagasTotais,
+      paridade: form.paridade,
       preview: true,
     });
     setCarregando(false);
@@ -111,6 +113,7 @@ export function GeradorLote({ cicloId, rts }: GeradorLoteProps): JSX.Element {
       ate: form.ate,
       tipos: form.tipos,
       vagasTotais: form.vagasTotais,
+      paridade: form.paridade,
       preview: false,
     });
     setCarregando(false);
@@ -176,6 +179,18 @@ export function GeradorLote({ cicloId, rts }: GeradorLoteProps): JSX.Element {
             onChange={(evento) => atualizarForm({ vagasTotais: Number(evento.target.value) })}
             className="w-24 rounded border border-slate-300 p-1"
           />
+        </label>
+        <label className="flex flex-col text-sm">
+          Dias do mês
+          <select
+            value={form.paridade}
+            onChange={(evento) => atualizarForm({ paridade: evento.target.value as FormularioLote['paridade'] })}
+            className="rounded border border-slate-300 p-1"
+          >
+            <option value="AMBOS">Ambos</option>
+            <option value="PAR">Só pares</option>
+            <option value="IMPAR">Só ímpares</option>
+          </select>
         </label>
       </div>
 

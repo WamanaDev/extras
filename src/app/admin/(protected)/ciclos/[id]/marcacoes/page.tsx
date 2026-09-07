@@ -23,6 +23,11 @@ interface ColaboradorOpcao {
   matricula: string;
 }
 
+interface RtOpcao {
+  id: string;
+  nome: string;
+}
+
 interface MarcacaoListada {
   id: string;
   colaborador: { id: string; nome: string; matricula: string; rt: string };
@@ -45,6 +50,13 @@ export default function MarcacoesCicloPage({ params }: { params: Promise<{ id: s
   const marcacoes = useRecursoApi<RespostaMarcacoes>(`/api/admin/marcacoes?cicloId=${encodeURIComponent(id)}&tamanho=200`);
   const plantoes = useRecursoApi<{ itens: PlantaoOpcao[] }>(`/api/admin/ciclos/${encodeURIComponent(id)}/plantoes`);
   const colaboradores = useListaApi<ColaboradorOpcao>('/api/admin/colaboradores?tamanho=200');
+  const rts = useRecursoApi<{ itens: RtOpcao[] }>('/api/admin/rts');
+
+  // Pedido do usuário: além de atribuir num plantão já existente, dá pra criar
+  // um plantão novo (1 vaga, exclusivo pra esta marcação) no mesmo passo —
+  // `criarNovoPlantao` alterna o formulário entre os dois modos.
+  const [criarNovoPlantao, setCriarNovoPlantao] = useState(false);
+  const [novoPlantaoRtId, setNovoPlantaoRtId] = useState('');
 
   // Trocado de "um select com todo plantão" (linha única data+turno+RT+vagas,
   // difícil de escanear) para data + turno separados — mais intuitivo
@@ -79,15 +91,20 @@ export default function MarcacoesCicloPage({ params }: { params: Promise<{ id: s
   async function marcar(): Promise<void> {
     setEnviando(true);
     setErro(null);
-    const resultado = await post<{ id: string }>('/api/admin/marcacoes', { plantaoId, colaboradorId, motivo });
+    const corpo = criarNovoPlantao
+      ? { novoPlantao: { cicloId: id, rtId: novoPlantaoRtId, data, tipo: turno, permiteCruzada: null }, colaboradorId, motivo }
+      : { plantaoId, colaboradorId, motivo };
+    const resultado = await post<{ id: string }>('/api/admin/marcacoes', corpo);
     setEnviando(false);
     if (resultado.ok) {
       setData('');
       setTurno('');
       setRtId('');
+      setNovoPlantaoRtId('');
       setColaboradorId('');
       setMotivo('');
       marcacoes.recarregar();
+      plantoes.recarregar();
     } else {
       setErro(resultado.erro);
     }
@@ -115,6 +132,20 @@ export default function MarcacoesCicloPage({ params }: { params: Promise<{ id: s
 
       <section className="rounded-lg border border-slate-200 bg-white p-4">
         <h2 className="mb-3 text-sm font-semibold text-slate-900">Marcar extra manualmente</h2>
+
+        <label className="mb-3 flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={criarNovoPlantao}
+            onChange={(evento) => {
+              setCriarNovoPlantao(evento.target.checked);
+              setRtId('');
+              setNovoPlantaoRtId('');
+            }}
+          />
+          Criar um plantão novo (1 vaga, exclusivo) só para esta marcação
+        </label>
+
         <div className="flex flex-wrap items-end gap-3">
           <label className="flex flex-col text-sm">
             Dia
@@ -145,34 +176,58 @@ export default function MarcacoesCicloPage({ params }: { params: Promise<{ id: s
               <option value="NOTURNO">Noturno</option>
             </select>
           </label>
-          {rtsDisponiveis.length > 1 ? (
+
+          {criarNovoPlantao ? (
             <label className="flex flex-col text-sm">
-              RT
-              <select value={rtId} onChange={(evento) => setRtId(evento.target.value)} className="w-48 rounded border border-slate-300 p-2">
+              RT (do plantão novo)
+              <select
+                value={novoPlantaoRtId}
+                onChange={(evento) => setNovoPlantaoRtId(evento.target.value)}
+                className="w-48 rounded border border-slate-300 p-2"
+              >
                 <option value="" disabled>
                   Selecione…
                 </option>
-                {rtsDisponiveis.map((rt) => (
+                {(rts.dados?.itens ?? []).map((rt) => (
                   <option key={rt.id} value={rt.id}>
                     {rt.nome}
                   </option>
                 ))}
               </select>
             </label>
-          ) : null}
-          {data && turno && plantoesDoDiaTurno.length === 0 ? (
-            <p className="text-sm text-amber-700">Nenhum plantão cadastrado para este dia/turno.</p>
-          ) : null}
-          {plantaoId ? (
-            (() => {
-              const p = plantoesDoDiaTurno.find((pl) => pl.id === plantaoId);
-              return p ? (
-                <p className="text-sm text-slate-500">
-                  {p.rtNome} — {p.vagasOcupadas}/{p.vagasTotais} vaga(s) ocupada(s)
-                </p>
-              ) : null;
-            })()
-          ) : null}
+          ) : (
+            <>
+              {rtsDisponiveis.length > 1 ? (
+                <label className="flex flex-col text-sm">
+                  RT
+                  <select value={rtId} onChange={(evento) => setRtId(evento.target.value)} className="w-48 rounded border border-slate-300 p-2">
+                    <option value="" disabled>
+                      Selecione…
+                    </option>
+                    {rtsDisponiveis.map((rt) => (
+                      <option key={rt.id} value={rt.id}>
+                        {rt.nome}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              {data && turno && plantoesDoDiaTurno.length === 0 ? (
+                <p className="text-sm text-amber-700">Nenhum plantão cadastrado para este dia/turno.</p>
+              ) : null}
+              {plantaoId ? (
+                (() => {
+                  const p = plantoesDoDiaTurno.find((pl) => pl.id === plantaoId);
+                  return p ? (
+                    <p className="text-sm text-slate-500">
+                      {p.rtNome} — {p.vagasOcupadas}/{p.vagasTotais} vaga(s) ocupada(s)
+                    </p>
+                  ) : null;
+                })()
+              ) : null}
+            </>
+          )}
+
           <label className="flex flex-col text-sm">
             Colaborador
             <select value={colaboradorId} onChange={(evento) => setColaboradorId(evento.target.value)} className="w-64 rounded border border-slate-300 p-2">
@@ -190,8 +245,11 @@ export default function MarcacoesCicloPage({ params }: { params: Promise<{ id: s
             Motivo
             <input type="text" value={motivo} onChange={(evento) => setMotivo(evento.target.value)} className="rounded border border-slate-300 p-2" />
           </label>
-          <Button onClick={() => void marcar()} disabled={enviando || !plantaoId || !colaboradorId || !motivo}>
-            Marcar
+          <Button
+            onClick={() => void marcar()}
+            disabled={enviando || !colaboradorId || !motivo || !data || !turno || (criarNovoPlantao ? !novoPlantaoRtId : !plantaoId)}
+          >
+            {criarNovoPlantao ? 'Criar plantão e marcar' : 'Marcar'}
           </Button>
         </div>
         {erro ? (

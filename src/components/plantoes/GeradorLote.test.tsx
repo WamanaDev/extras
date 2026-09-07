@@ -37,4 +37,31 @@ describe('GeradorLote', () => {
     });
     expect(botaoGerar).toBeEnabled();
   });
+
+  it('seleção "Dias do mês" (Ambos/Par/Ímpar) — pedido do usuário — vai no corpo da chamada', async () => {
+    const usuario = userEvent.setup();
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ criados: 0, ignorados: [], preview: [] }),
+    } as unknown as Response);
+
+    render(<GeradorLote cicloId="ciclo-1" rts={[{ id: 'rt-1', nome: 'RT-1' }]} />);
+
+    // Padrão é "Ambos" (sem filtro) — comportamento inalterado pra quem não mexe no campo.
+    expect(screen.getByLabelText('Dias do mês')).toHaveValue('AMBOS');
+
+    await usuario.click(screen.getByLabelText('RT-1'));
+    await usuario.click(screen.getByLabelText('Diurno'));
+    fireEvent.change(screen.getByLabelText('De'), { target: { value: '2026-10-04' } });
+    fireEvent.change(screen.getByLabelText('Até'), { target: { value: '2026-10-20' } });
+    fireEvent.change(screen.getByLabelText('Dias do mês'), { target: { value: 'PAR' } });
+
+    await usuario.click(screen.getByRole('button', { name: 'Pré-visualizar' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const corpo = JSON.parse(init.body as string);
+    expect(corpo.paridade).toBe('PAR');
+  });
 });

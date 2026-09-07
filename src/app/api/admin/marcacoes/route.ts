@@ -10,6 +10,7 @@
 import { z, type ZodSchema } from 'zod';
 import { defineHandler, paginacaoQuerySchema } from '@/server/http/handler';
 import { obterPrisma } from '@/server/db/client';
+import { HORA_REGEX } from '@/server/plantoes/util';
 import { listarMarcacoesAdmin, marcarExtraAdmin } from '@/server/services/marcacoes-admin';
 
 // ----------------------------------------------------------------------------
@@ -85,25 +86,55 @@ export const GET = defineHandler({
 // POST — API-ADM-MAR-002
 // ----------------------------------------------------------------------------
 
-const MarcarBodySchema = z.object({
-  plantaoId: z.string().uuid(),
-  colaboradorId: z.string().uuid(),
-  // Obrigatório (API-ADM-MAR-002, "R"): sem isso o colaborador vê uma extra
-  // que não marcou e não há como explicar de onde veio.
-  motivo: z.string().trim().min(1, 'Motivo é obrigatório.'),
+const DATA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+// Pedido do usuário: além de marcar num plantão já existente, dá pra criar um
+// plantão novo (sempre 1 vaga, exclusivo pra esta marcação) no mesmo passo —
+// `novoPlantao` aqui, `criarPlantao` (API-ADM-PLA-001) reaproveitado dentro
+// da mesma transação de `marcar_extra` em `marcarExtraAdmin` (ver doc-comment
+// de `marcacoes-admin.ts`).
+const NovoPlantaoSchema = z.object({
+  cicloId: z.string().uuid(),
+  rtId: z.string().uuid(),
+  data: z
+    .string()
+    .regex(DATA_REGEX, 'Data deve estar no formato AAAA-MM-DD.')
+    .transform((valor) => new Date(`${valor}T00:00:00.000Z`)),
+  tipo: z.enum(['DIURNO', 'NOTURNO']),
+  horaInicio: z.string().regex(HORA_REGEX, 'Hora deve estar no formato HH:MM.').optional(),
+  horaFim: z.string().regex(HORA_REGEX, 'Hora deve estar no formato HH:MM.').optional(),
+  permiteCruzada: z.boolean().nullable().default(null),
 });
+
+const MarcarBodySchema = z
+  .object({
+    plantaoId: z.string().uuid().optional(),
+    novoPlantao: NovoPlantaoSchema.optional(),
+    colaboradorId: z.string().uuid(),
+    // Obrigatório (API-ADM-MAR-002, "R"): sem isso o colaborador vê uma extra
+    // que não marcou e não há como explicar de onde veio.
+    motivo: z.string().trim().min(1, 'Motivo é obrigatório.'),
+  })
+  .refine((v) => (v.plantaoId !== undefined) !== (v.novoPlantao !== undefined), {
+    message: 'Informe exatamente um entre "plantaoId" (plantão existente) e "novoPlantao" (criar um novo).',
+    path: ['plantaoId'],
+  });
 
 export const POST = defineHandler({
   ator: 'ADMIN',
   rateLimit: { escopo: 'marcacoes_por_sessao' },
-  body: MarcarBodySchema,
+  // Cast: mesma classe de erro de `../plantoes/lote/route.ts` (`_conflitos.md`,
+  // item 13) — `novoPlantao.data` tem `.transform()` e `permiteCruzada` tem
+  // `.default()`, então Input diverge de Output. Sem efeito em runtime.
+  body: MarcarBodySchema as unknown as ZodSchema<z.infer<typeof MarcarBodySchema>>,
   // Response 201 (API-ADM-MAR-002, "Igual a API-COL-004") — `defineHandler`
   // usa 200 por padrão em toda rota, `statusSucesso` é o override explícito.
   statusSucesso: 201,
   handler: async ({ ator, body, ctx }) => {
     const prisma = await obterPrisma();
     return marcarExtraAdmin(prisma, {
-      plantaoId: body.plantaoId,
+      ...(body.plantaoId !== undefined ? { plantaoId: body.plantaoId } : {}),
+      ...(body.novoPlantao !== undefined ? { novoPlantao: body.novoPlantao } : {}),
       colaboradorId: body.colaboradorId,
       motivo: body.motivo,
       adminId: ator.adminId,

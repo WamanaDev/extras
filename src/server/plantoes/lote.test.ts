@@ -139,6 +139,54 @@ describe('API-ADM-PLA-002 — gerarLotePlantoes', () => {
     expect(resultado.criados).toBe(uteis);
   });
 
+  it('7. paridade = PAR — só dias pares do intervalo (pedido do usuário)', async () => {
+    const { gerarLotePlantoes } = await import('./lote');
+    const { tx } = criarTxFake();
+
+    const resultado = await gerarLotePlantoes(
+      tx,
+      inputBase({ de: data('04'), ate: data('20'), tipos: ['DIURNO'], rtIds: ['rt-1'], paridade: 'PAR' }),
+      CTX,
+    );
+
+    // 04,06,08,10,12,14,16,18,20 → 9 dias pares no intervalo.
+    expect(resultado.criados).toBe(9);
+  });
+
+  it('8. paridade = IMPAR — só dias ímpares do intervalo', async () => {
+    const { gerarLotePlantoes } = await import('./lote');
+    const { tx } = criarTxFake();
+
+    const resultado = await gerarLotePlantoes(
+      tx,
+      inputBase({ de: data('04'), ate: data('20'), tipos: ['DIURNO'], rtIds: ['rt-1'], paridade: 'IMPAR' }),
+      CTX,
+    );
+
+    // 05,07,09,11,13,15,17,19 → 8 dias ímpares no intervalo.
+    expect(resultado.criados).toBe(8);
+  });
+
+  it('9. paridade = AMBOS (ou omitida) — nenhum filtro, comportamento idêntico ao de antes', async () => {
+    const { gerarLotePlantoes } = await import('./lote');
+    const { tx: txAmbos } = criarTxFake();
+    const { tx: txOmitido } = criarTxFake();
+
+    const resultadoAmbos = await gerarLotePlantoes(
+      txAmbos,
+      inputBase({ de: data('04'), ate: data('20'), tipos: ['DIURNO'], rtIds: ['rt-1'], paridade: 'AMBOS' }),
+      CTX,
+    );
+    const resultadoOmitido = await gerarLotePlantoes(
+      txOmitido,
+      inputBase({ de: data('04'), ate: data('20'), tipos: ['DIURNO'], rtIds: ['rt-1'] }),
+      CTX,
+    );
+
+    expect(resultadoAmbos.criados).toBe(17); // 04..20 inclusive = 17 dias
+    expect(resultadoOmitido.criados).toBe(17);
+  });
+
   it('itens fora do mês do ciclo são ignorados com FORA_DO_CICLO', async () => {
     const { gerarLotePlantoes } = await import('./lote');
     const { tx } = criarTxFake();

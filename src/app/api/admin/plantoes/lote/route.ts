@@ -23,6 +23,7 @@ const LoteSchema = z
     tipos: z.array(z.enum(['DIURNO', 'NOTURNO'])).min(1),
     vagasTotais: z.number().int().positive(),
     diasSemana: z.array(z.number().int().min(0).max(6)).optional(),
+    paridade: z.enum(['PAR', 'IMPAR', 'AMBOS']).optional(),
     permiteCruzada: z.boolean().nullable().default(null),
     preview: z.boolean().optional().default(false),
   })
