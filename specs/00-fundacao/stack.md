@@ -14,7 +14,7 @@
 | Auth admin | Supabase Auth + MFA | Pronto, auditável |
 | Auth colaborador | Própria (matrícula + PIN) | Colaborador não tem e-mail corporativo |
 | Validação | Zod | Schema compartilhado entre borda e serviço |
-| UI | Tailwind + shadcn/ui | Velocidade |
+| UI | Tailwind + primitivos próprios no espírito shadcn/ui | Velocidade |
 | Testes | Vitest + Playwright + pgTAP | Unidade, e2e, e regras no banco |
 | Deploy | Vercel | Preview por PR |
 
@@ -38,3 +38,12 @@ Ausências precisam de linha para serem editadas e impressas. A geração é ide
 
 **D-05 — PIN obrigatório.**
 Matrícula é identificador, não segredo. Ver `02-seguranca/confidencialidade.md`.
+
+**D-06 — UI sem `@radix-ui/react-*`.**
+`class-variance-authority`, `clsx`, `tailwind-merge` e `lucide-react` (as peças de estilo do
+padrão shadcn/ui) estão instaladas, mas nenhum pacote `@radix-ui/react-*` — os componentes de
+`src/components/ui/` (`button`, `badge`, `tooltip`, `dialog`) são implementações próprias
+sobre HTML nativo (`<dialog>` para modal, `title`/`aria-describedby` para tooltip), com a
+mesma composição de classes que shadcn/ui geraria. Evita expandir a superfície de dependências
+sem uma spec de `06-frontend/*` que peça um primitivo específico. Overlays mais complexos
+(`<Select>` com busca, `<Popover>` posicionado) podem justificar adicionar Radix depois.

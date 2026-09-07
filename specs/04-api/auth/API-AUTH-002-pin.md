@@ -18,14 +18,17 @@ Segunda etapa. Valida o PIN e cria a sessão.
 ```
 
 ### Response 200
-Cookie `sessao` (`httpOnly`, `Secure`, `SameSite=Lax`) + body:
+Cookie `sessao_colaborador` (`httpOnly`, `Secure`, `SameSite=Lax`) + body:
 ```ts
 { colaborador: { id, nome, matricula, rt: { codigo, nome } }, expiraEm: string }
 ```
 
+`rt.codigo` é alimentado por `rt.nome` — a tabela `rt` não tem coluna `codigo` própria, só
+`nome` como rótulo (`prisma/schema.prisma`, model `Rt`).
+
 ### Erros
 `CREDENCIAIS_INVALIDAS` 401 · `TOKEN_INVALIDO` 401 · `CONTA_BLOQUEADA` 423 ·
-`PIN_NAO_DEFINIDO` 409 · `MUITAS_TENTATIVAS` 429
+`PIN_NAO_DEFINIDO` 409 · `LIMITE_EXCEDIDO` 429
 
 ## Autorização
 
@@ -38,7 +41,7 @@ Exige `tokenParcial` válido, não expirado e não usado.
 3. `argon2.verify(pinHash, pin + PIN_PEPPER)`
 4. Registrar `tentativa_login` e auditar `LOGIN_SUCESSO` / `LOGIN_FALHA`
 5. Sucesso: gerar token de 32 bytes, gravar **SHA-256** em `sessao_colaborador`,
-   `expiraEm = now() + 8h`, setar cookie
+   `expiraEm = now() + 8h`, setar cookie `sessao_colaborador`
 6. Zerar `tentativasFalhas`
 
 ## ACID

@@ -20,6 +20,8 @@ erDiagram
     COLABORADOR ||--o{ TENTATIVA_LOGIN : "tentativas"
     PLANTAO ||--o{ MARCACAO : "recebe"
     CODIGO_ESCALA ||--o{ ESCALA_DIA : "classifica"
+    MARCACAO ||--o{ SOLICITACAO_CANCELAMENTO : "pedidos"
+    COLABORADOR ||--o{ SOLICITACAO_CANCELAMENTO : "solicita"
 ```
 
 ## Tabelas
@@ -38,6 +40,8 @@ erDiagram
 | `sessao_colaborador` | Sessões | ~20.000 |
 | `tentativa_login` | Tentativas (expurgo 90d) | ~25.000 |
 | `audit_log` | Trilha (retenção 5a) | ~60.000 |
+| `solicitacao_cancelamento` | Pedido de cancelamento de extra pelo colaborador, aprovação de qualquer admin | ~300 |
+| `google_calendar_conta` | Integração Google Calendar por colaborador (`API-COL-008`) | ~80 |
 
 Volume pequeno. As decisões de modelagem priorizam **correção e auditabilidade**, não escala.
 
@@ -61,8 +65,10 @@ Volume pequeno. As decisões de modelagem priorizam **correção e auditabilidad
 | `marcacao` → `colaborador` | `RESTRICT` | histórico não se perde |
 | `tentativa_login` → `colaborador` | `SET NULL` | tentativa pode ser de matrícula inexistente |
 | `escala_dia` → `codigo_escala` | `RESTRICT` | código em uso não se apaga (`DOM-003.5`) |
+| `solicitacao_cancelamento` → `marcacao` | `CASCADE` | pedido não sobrevive à marcação que o originou |
+| `solicitacao_cancelamento` → `colaborador` | `CASCADE` | idem, histórico do pedido some com o colaborador |
 
-O schema Prisma completo está em `03-banco/schema.prisma.md`.
+O schema Prisma completo está em `prisma/schema.prisma` (não há markdown espelho separado).
 
 ## Testes de aceitação
 

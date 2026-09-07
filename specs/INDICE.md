@@ -63,9 +63,13 @@
 | `API-ADM-ESC-002` | [API-ADM-ESC-002 — `PATCH /api/admin/escala/:id`](04-api/admin-escala/API-ADM-ESC-002-alterar-dia.md) | PRONTA | 🔒 |
 | `API-ADM-ESC-003` | [API-ADM-ESC-003 — `POST /api/admin/escala/lote`](04-api/admin-escala/API-ADM-ESC-003-lote.md) | PRONTA |  |
 | `API-ADM-ESC-004` | [API-ADM-ESC-004 — `GET /api/admin/ciclos/:id/escala/export`](04-api/admin-escala/API-ADM-ESC-004-exportar.md) | PRONTA |  |
+| `API-ADM-REF-001` | [API-ADM-REF-001 — `GET /api/admin/rts`](04-api/admin-referencias/API-ADM-REF-001-rts.md) | PRONTA |  |
+| `API-ADM-REF-002` | [API-ADM-REF-002 — `/api/admin/codigos-escala`](04-api/admin-referencias/API-ADM-REF-002-codigos-escala.md) | PRONTA |  |
+| `API-ADM-REF-003` | [API-ADM-REF-003 — `GET /api/admin/ciclos/:id/plantoes`](04-api/admin-referencias/API-ADM-REF-003-plantoes-do-ciclo.md) | PRONTA |  |
 | `API-ADM-MAR-001` | [API-ADM-MAR-001 — `GET /api/admin/marcacoes`](04-api/admin-marcacoes/API-ADM-MAR-001-listar.md) | PRONTA |  |
 | `API-ADM-MAR-002` | [API-ADM-MAR-002 — `POST /api/admin/marcacoes`](04-api/admin-marcacoes/API-ADM-MAR-002-marcar.md) | PRONTA |  |
 | `API-ADM-MAR-003` | [API-ADM-MAR-003 — `DELETE /api/admin/marcacoes/:id`](04-api/admin-marcacoes/API-ADM-MAR-003-cancelar.md) | PRONTA |  |
+| `API-ADM-MAR-004` | [API-ADM-MAR-004 — Solicitações de cancelamento](04-api/admin-marcacoes/API-ADM-MAR-004-solicitacoes-cancelamento.md) | PRONTA |  |
 | `API-ADM-PAR-001` | [API-ADM-PAR-001 — `PUT /api/admin/ciclos/:id/participacoes/:colaboradorId`](04-api/admin-participacoes/API-ADM-PAR-001-definir.md) | PRONTA |  |
 | `API-ADM-PAR-002` | [API-ADM-PAR-002 — `POST /api/admin/ciclos/:id/participacoes/lote`](04-api/admin-participacoes/API-ADM-PAR-002-lote.md) | PRONTA |  |
 | `API-ADM-PLA-001` | [API-ADM-PLA-001 — `POST /api/admin/plantoes`](04-api/admin-plantoes/API-ADM-PLA-001-criar.md) | PRONTA |  |
@@ -82,6 +86,7 @@
 | `API-AUTH-004` | [API-AUTH-004 — `POST /api/auth/colaborador/logout`](04-api/auth/API-AUTH-004-logout.md) | PRONTA |  |
 | `API-AUTH-005` | [API-AUTH-005 — `GET /api/auth/me`](04-api/auth/API-AUTH-005-me.md) | PRONTA |  |
 | `API-AUTH-006` | [API-AUTH-006 — `POST /api/auth/admin/login`](04-api/auth/API-AUTH-006-admin-login.md) | PRONTA |  |
+| `API-AUTH-007` | [API-AUTH-007 — `POST /api/auth/colaborador/login-rapido`](04-api/auth/API-AUTH-007-login-rapido.md) | PRONTA |  |
 | `API-COL-001` | [API-COL-001 — `GET /api/ciclos/atual`](04-api/colaborador/API-COL-001-ciclo-atual.md) | PRONTA |  |
 | `API-COL-002` | [API-COL-002 — `GET /api/minha-escala?cicloId=`](04-api/colaborador/API-COL-002-minha-escala.md) | PRONTA |  |
 | `API-COL-003` | [API-COL-003 — `GET /api/plantoes?cicloId=`](04-api/colaborador/API-COL-003-plantoes.md) | PRONTA |  |
@@ -89,6 +94,9 @@
 | `API-COL-005` | [API-COL-005 — `DELETE /api/marcacoes/:id`](04-api/colaborador/API-COL-005-cancelar.md) | PRONTA |  |
 | `API-COL-006` | [API-COL-006 — `GET /api/minhas-marcacoes?cicloId=`](04-api/colaborador/API-COL-006-minhas-marcacoes.md) | PRONTA |  |
 | `API-COL-007` | [API-COL-007 — `GET /api/meu-saldo?cicloId=`](04-api/colaborador/API-COL-007-saldo.md) | PRONTA |  |
+| `API-COL-008` | [API-COL-008 — Google Calendar (conectar, callback, status, sincronizar)](04-api/colaborador/API-COL-008-google-calendar.md) | PRONTA | 🔒 |
+| `API-COL-009` | [API-COL-009 — `GET /api/ciclos/vizinhos?ano=&mes=`](04-api/colaborador/API-COL-009-ciclos-vizinhos.md) | PRONTA |  |
+| `API-NOT-001` | [API-NOT-001 — `GET /api/cron/lembrete-extra?turno=`](04-api/notificacoes/API-NOT-001-cron-lembrete-extra.md) | PRONTA | 🔒 |
 | `RT-001` | [Canais de Realtime](05-realtime/canais.md) | PRONTA |  |
 | `RT-002` | [Fallback e reconexão](05-realtime/fallback.md) | PRONTA |  |
 | `FE-002` | [Componentes-chave](06-frontend/componentes.md) | PRONTA |  |

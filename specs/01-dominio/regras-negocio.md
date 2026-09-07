@@ -29,7 +29,7 @@ Fonte única de verdade. Specs de rota e de função **referenciam** por ID; nã
 | RN-13 | Extra não pode sobrepor o próprio plantão | `FN-004` |
 | RN-14 | Extra imediatamente antes ou depois é permitida | `FN-004` |
 | RN-15 | Blocos com `ocupaHorario` contam mesmo sem presença | `FN-003` |
-| RN-16 | Extra em dia com ausência é bloqueada salvo `permiteExtraEmFolga` | `FN-005` |
+| RN-16 | Extra em dia com ausência é bloqueada salvo `permiteExtraEmFolga`. Extra NOTURNA cruza meia-noite: bloqueia se o dia do plantão **ou** o dia seguinte tiver ausência (qualquer código ≠ `D`) — extra DIURNA continua checando só o próprio dia | `FN-005`, `FN-007` |
 | RN-17 | `maxBlocosSeguidos` é configurável por ciclo (padrão 2, teto 3) | schema |
 
 ## Extras

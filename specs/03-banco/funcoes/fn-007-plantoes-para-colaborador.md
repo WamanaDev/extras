@@ -13,12 +13,16 @@ colaborador fica olhando célula cinza sem entender.
 ```sql
 plantoes_para_colaborador(p_ciclo_id uuid, p_colaborador_id uuid)
 RETURNS TABLE (
-  plantao_id uuid, data date, tipo tipo_plantao, rt_codigo text,
+  plantao_id uuid, data date, tipo turno, rt_codigo text,
   hora_inicio text, hora_fim text,
   vagas_totais int, vagas_ocupadas int,
   ja_marcado boolean, disponivel boolean, motivo text
 ) STABLE
 ```
+
+`tipo` usa o enum `turno` (`DIURNO`/`NOTURNO`, mesmo enum de `plantao.tipo`) — não existe
+`tipo_plantao`. `rt_codigo` é alimentado por `rt.nome` (única coluna de rótulo que `rt` tem
+hoje — não existe coluna `rt.codigo` separada).
 
 ## Ordem dos motivos
 
@@ -35,6 +39,11 @@ do que a célula sumir.
 
 ## Notas
 
+- `EM_AUSENCIA` usa o mesmo critério de dois dias do passo 7 de `FN-005` (RN-16 estendida):
+  para plantão `NOTURNO`, considera ausência tanto no dia do plantão quanto no dia seguinte
+  (o turno cruza a meia-noite e "vaza" para a madrugada do dia seguinte); para `DIURNO`,
+  continua checando só o próprio dia. As duas funções não podem divergir — este teste é
+  F7-8.
 - Retorna **todos** os plantões do ciclo, inclusive bloqueados. Esconder gera dúvida.
 - Plantão de outra RT com cruzada desligada aparece com `motivo = 'CRUZADA_BLOQUEADA'`,
   em seção visualmente separada. O colaborador vê que existe e por que não pode.
@@ -64,5 +73,6 @@ não como falha: mostra o motivo e recarrega a grade.
 | F7-5 | Mesmo turno do plantão base | `CONFLITO_DE_HORARIO` |
 | F7-6 | Formaria 36h | `EXCEDE_JORNADA` |
 | F7-7 | Já marcado | `ja_marcado = true` |
+| F7-7b | Plantão NOTURNO na véspera de dia com ausência (D+1) | `EM_AUSENCIA` |
 | F7-8 | Motivo aqui vs erro de `FN-005` | idênticos em 100 cenários |
 | F7-9 | Ciclo com 50 plantões | < 100 ms |

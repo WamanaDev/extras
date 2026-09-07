@@ -9,9 +9,14 @@
 
 ```sql
 cancelar_extra(
-  p_marcacao_id uuid, p_ator_tipo text, p_ator_id uuid, p_ip text, p_user_agent text
+  p_marcacao_id uuid, p_ator_id uuid, p_ator_tipo text
 ) RETURNS marcacao
 ```
+
+`p_ip`/`p_user_agent` não fazem parte da assinatura: `marcacao` não tem colunas `ip`/
+`user_agent` (essa informação vive só em `audit_log`, gravado pelo chamador na mesma
+transação — mesma decisão de `FN-005 marcar_extra`). A ordem/tipos batem exatamente com o
+`ALTER FUNCTION`/`GRANT EXECUTE` de `02-seguranca/rls-policies.md`.
 
 ## Comportamento
 
@@ -42,8 +47,7 @@ Duplo clique não deve produzir erro assustador nem decrementar duas vezes.
 
 | Erro | Quando |
 |---|---|
-| `MARCACAO_INEXISTENTE` | id inválido |
-| `NAO_AUTORIZADO` | colaborador tentando cancelar de terceiro |
+| `MARCACAO_INEXISTENTE` | id inválido, ou colaborador tentando cancelar de terceiro |
 | `JANELA_ENCERRADA` | colaborador após o fechamento |
 | `CICLO_FECHADO` | ciclo fechado |
 

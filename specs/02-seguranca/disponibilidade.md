@@ -30,9 +30,17 @@ Duas finalidades distintas: conter abuso de credencial e conter avalanche legít
 | Login por matrícula, acumulado | 10 falhas / 24 h | bloqueio até liberação manual |
 | Login por IP | 20 tentativas / 15 min | `429` |
 | Login por IP, acumulado | 100 / 24 h | `429` + alerta no dashboard |
+| Login admin por e-mail | 5 / 15 min | `429` |
+| Login admin por IP | 20 / 15 min | `429` |
 | `POST /api/marcacoes` por sessão | 10 / min | `429` |
 | Leitura autenticada por sessão | 120 / min | `429` |
 | Global por IP | 300 / min | `429` |
+
+Login admin usa escopos próprios no rate limiter (`login_admin_email`, `login_admin_ip`),
+independentes dos escopos de login de colaborador (`login_matricula`/`login_ip`) — mesmo
+prefixo/chave reaproveitados travariam os dois fluxos juntos, quebrando a independência
+exigida por `API-AUTH-006`. Falha fechada nos dois pares de escopo, igual ao login de
+colaborador.
 
 `429` sempre com `Retry-After`. Bloqueio de conta é **temporário por padrão** — bloqueio
 permanente automático transformaria o rate limit em vetor de negação de serviço contra

@@ -14,9 +14,12 @@ Devolve o ator da sessão. Usado no boot do cliente para decidir a rota inicial.
 
 ### Response 200
 ```ts
-{ tipo: 'COLABORADOR', colaborador: { id, nome, matricula, rt } , expiraEm }
+{ tipo: 'COLABORADOR', colaborador: { id, nome, matricula, rt: { codigo, nome } } , expiraEm }
 | { tipo: 'ADMIN', admin: { id, email, nome } }
 ```
+
+`rt.codigo` é alimentado por `rt.nome` — mesma resolução de `API-AUTH-002` (`rt` não tem
+coluna `codigo` própria).
 
 ### Erros
 `401` sem sessão.
@@ -29,11 +32,15 @@ Sessão válida de qualquer tipo.
 
 1. Validar sessão
 2. Renovar deslizante se restar < 2h e o teto de 12h não foi atingido
-3. Atualizar `ultimoUsoEm`
 
 ## ACID
 
-Renovação e `ultimoUsoEm` no mesmo `UPDATE`.
+Renovação de `expiraEm` num único `UPDATE`.
+
+> Pendência conhecida: `sessao_colaborador` ainda não tem coluna `ultimoUsoEm` no schema
+> (`prisma/schema.prisma` só tem `criadoEm`/`expiraEm`/`revogadaEm`/`ip`/`userAgent`), então
+> esta rota não grava esse campo hoje. Adicionar a coluna é mudança de `03-banco/modelo-dados.md`
+> e depende de revisão humana antes de virar migration.
 
 ## CIA
 

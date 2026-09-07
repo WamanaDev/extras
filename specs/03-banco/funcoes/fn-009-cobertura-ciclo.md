@@ -8,10 +8,14 @@
 
 ```sql
 cobertura_ciclo(p_ciclo_id uuid)
-RETURNS TABLE (data date, rt_codigo text, turno tipo_plantao,
+RETURNS TABLE (data date, rt_codigo text, turno turno,
                escalados int, extras int, total int, minimo int, deficit int)
 STABLE
 ```
+
+`turno` usa o enum `turno` (`DIURNO`/`NOTURNO`, mesmo enum de `plantao.tipo`) — não existe
+`tipo_plantao`. `rt_codigo` é alimentado por `rt.nome` (única coluna de rótulo que `rt` tem
+hoje — mesma resolução já aplicada em `FN-007`).
 
 ## Comportamento
 
@@ -21,7 +25,9 @@ Para cada (dia, RT, turno) do ciclo:
 - `extras` = marcações confirmadas em plantões daquele slot
 - `deficit` = `GREATEST(minimo − total, 0)`
 
-`minimo` vem da configuração da RT (`rt.cobertura_minima_diurno` / `_noturno`).
+`minimo` vem da configuração da RT (`rt.cobertura_minima_diurno` / `_noturno`, colunas
+`int NOT NULL DEFAULT 0` — sem configuração explícita, mínimo `0` nunca gera déficit até o
+admin definir um valor real).
 
 ## Uso
 

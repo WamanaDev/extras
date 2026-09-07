@@ -23,7 +23,7 @@ Login administrativo delegado ao Supabase Auth, com MFA obrigatório.
 ```
 
 ### Erros
-`CREDENCIAIS_INVALIDAS` 401 · `MFA_OBRIGATORIO` 403 · `MUITAS_TENTATIVAS` 429
+`CREDENCIAIS_INVALIDAS` 401 · `MFA_OBRIGATORIO` 403 · `LIMITE_EXCEDIDO` 429
 
 ## Autorização
 
@@ -34,6 +34,17 @@ Pública, com rate limit próprio (5/15min por e-mail, 20/15min por IP).
 1. Delegar ao Supabase Auth
 2. Exigir fator MFA — admin sem MFA é bloqueado até cadastrar
 3. Auditar `LOGIN_ADMIN_SUCESSO` / `_FALHA`
+
+`desafioId` no corpo de `{ precisaMfa: true, desafioId }` é o id do *challenge* criado no
+servidor (`auth.desafiarFator`), mas a resposta não inclui o `factorId` que o SDK do Supabase
+no navegador precisa para verificar esse mesmo challenge
+(`supabase.auth.mfa.verify({ factorId, challengeId, code })`). Na prática, `/admin/login`
+não reaproveita `desafioId`: na etapa de MFA o cliente lista os próprios fatores
+(`supabase.auth.mfa.listFactors()`, já autenticado em `aal1` pelos cookies que esta rota
+grava) e chama `mfa.challengeAndVerify({ factorId, code })`, que cria e verifica um challenge
+novo numa chamada só. Efeito observável é idêntico; o challenge exibido em `desafioId` acaba
+não sendo o usado na verificação. Uma evolução futura pode incluir `factorId` na resposta
+para o cliente verificar o challenge exato que o servidor criou, evitando o segundo challenge.
 
 ## ACID
 

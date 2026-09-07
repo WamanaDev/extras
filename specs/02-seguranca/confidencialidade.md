@@ -67,7 +67,26 @@ filtrado no servidor.
 
 - TLS 1.2+ obrigatório; HSTS com `max-age=63072000; includeSubDomains; preload`
 - Cookie: `httpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, sem `Domain` amplo
-- CSP sem `unsafe-inline`; nonce por request
+- CSP sem `unsafe-inline`; nonce por request, gerado em `src/middleware.ts` (Web Crypto,
+  compatível com o runtime Edge)
+  - O nonce e o header `Content-Security-Policy` são setados tanto nos headers de
+    **requisição** repassados via `NextResponse.next({ request: { headers } })` quanto nos de
+    **resposta** — o Next.js só aplica o nonce aos próprios `<script>` que injeta (payload de
+    hidratação, streaming de RSC) se enxergar a CSP também no request; presente só na resposta
+    não é suficiente
+  - `script-src` inclui `'strict-dynamic'` além do nonce — receita oficial do Next.js para CSP
+    com nonce em App Router: propaga a confiança do script raiz (com nonce) para os `<script>`
+    que o próprio framework injeta dinamicamente em runtime, cada um com hash diferente. `'self'`
+    continua listado como fallback para navegadores sem suporte a CSP Level 2
+  - O layout raiz (`src/app/layout.tsx`) é `async` e chama `await headers()` só para forçar
+    renderização dinâmica de toda a árvore — sem isso, qualquer rota sem API dinâmica própria é
+    pré-renderizada em build time com um nonce fixo no HTML que nunca bate com o nonce (gerado
+    por requisição) da CSP corrente, e o script é bloqueado
+  - **Cuidado ao montar `headers` em `NextResponse.next({ request: { headers } })`:** esse
+    `request.headers` **substitui** inteiramente o conjunto repassado adiante no pipeline, não
+    faz merge. `src/middleware.ts` clona `request.headers` recebido (`new Headers(request.headers)`)
+    e só adiciona `x-csp-nonce` a ele — nunca cria um `Headers` novo do zero, ou todo header do
+    cliente (`Cookie`, `X-Requested-With`) some das rotas depois do middleware
 - `Referrer-Policy: strict-origin-when-cross-origin`
 - `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`
 

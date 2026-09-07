@@ -30,12 +30,17 @@ e o ambiente seguinte não tem. Se não está na migration, não existe.
 005_triggers             -- DB-003
 006_indices              -- DB-004
 007_funcoes              -- 03-banco/funcoes/*
-008_rls                  -- SEC-RLS
-009_roles_grants         -- SEC-CONF
+008_roles_grants         -- SEC-CONF (cria o role app_server)
+009_rls                  -- SEC-RLS (policies referenciam app_server)
 010_seed_referencia      -- rt, codigo_escala
 ```
 
-Ordem importa: RLS depois das tabelas, grants depois das funções.
+Ordem importa: grants depois das funções, e **roles/grants antes de RLS** — as policies de
+`009_rls` fazem `CREATE POLICY ... TO app_server`/`GRANT EXECUTE ... TO app_server`, e esse
+role só existe a partir de `008_roles_grants` (`CREATE ROLE app_server ...`). A ordem inversa
+(RLS antes de roles/grants) falha contra Postgres real com `role "app_server" does not exist`
+(`42704`) — `roles_grants` não depende de nenhuma policy, só de tabelas já existentes desde
+`003_tabelas`, então inverter é seguro.
 
 ## Seed
 

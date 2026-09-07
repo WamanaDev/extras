@@ -29,6 +29,17 @@ CREATE INDEX idx_tentativa_ip ON tentativa_login (ip, criado_em DESC);
 -- Auditoria
 CREATE INDEX idx_audit_entidade ON audit_log (entidade, entidade_id, criado_em DESC);
 CREATE INDEX idx_audit_ator ON audit_log (ator_id, criado_em DESC);
+
+-- Fila de cancelamento (API-ADM-MAR-004)
+CREATE INDEX solicitacao_cancelamento_status_criado_em_idx
+  ON solicitacao_cancelamento (status, criado_em);
+CREATE INDEX solicitacao_cancelamento_colaborador_id_idx
+  ON solicitacao_cancelamento (colaborador_id);
+-- Único parcial (WHERE) em vez de `@@unique` no Prisma (não modela WHERE) —
+-- nunca mais de um pedido PENDENTE por marcação; decisão final é do banco.
+CREATE UNIQUE INDEX solicitacao_cancelamento_pendente_unica
+  ON solicitacao_cancelamento (marcacao_id)
+  WHERE status = 'PENDENTE';
 ```
 
 Índices parciais (`WHERE`) reduzem tamanho e mantêm o índice quente nas linhas que

@@ -45,7 +45,7 @@ Se na prática o TRE liberar a pessoa para extras, é troca de flag no cadastro 
 | DOM-003.3 | Alterar ausência em dia com extra marcada exige confirmação e gera `audit_log`. |
 | DOM-003.4 | Código com `presenca = true` conta na cobertura mínima da RT. |
 | DOM-003.5 | Excluir código em uso é proibido; desativa-se (`ativo = false`). |
-| DOM-003.6 | Código `bloqueado` (D, F, FE) é imutável: não pode ser desativado nem ter flags alteradas. Revisado a pedido do usuário — antes só `D`. |
+| DOM-003.6 | Código `bloqueado` (D, F, FE) é imutável: não pode ser desativado nem ter flags/descrição alteradas. Exceção: `cor` continua editável mesmo bloqueado — a cor é só apresentação, não afeta nenhuma regra de negócio deste arquivo (pedido do usuário). Revisado a pedido do usuário — antes só `D`. |
 
 ## Impressão
 

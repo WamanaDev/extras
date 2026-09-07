@@ -13,7 +13,11 @@ Atende pedido de acesso do titular (LGPD art. 18). Exporta tudo que o sistema gu
 ## Contrato
 
 ### Query
-`?formato=json|pdf`
+`?formato=json|pdf` — `json` é o formato completo acima e o único com teste de aceitação
+dedicado. `pdf` (via `pdfkit`, já usado por `API-ADM-ESC-004`) gera um documento de texto
+simples com cadastro, contagens e o aviso de retenção — não um espelho completo dos arrays
+de `json`; o binário volta em base64 no corpo do handler interno, reempacotado pela função
+`GET` exportada (mesmo padrão de `escala/export/route.ts`), sem duplicar autenticação/auditoria.
 
 ### Response 200
 ```ts

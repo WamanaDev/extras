@@ -35,7 +35,7 @@ descobrimos se a matrícula existe — o que facilitaria enumeração por difere
 | `CREDENCIAIS_INVALIDAS` | 401 | matrícula inexistente |
 | `CONTA_BLOQUEADA` | 423 | `bloqueadoAte > now()` |
 | `COLABORADOR_INATIVO` | 403 | desligado |
-| `MUITAS_TENTATIVAS` | 429 | rate limit de IP |
+| `LIMITE_EXCEDIDO` | 429 | rate limit de IP |
 
 ## Autorização
 

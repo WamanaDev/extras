@@ -28,7 +28,7 @@ A ordem não é estética: define a prevenção de deadlock e a mensagem que o u
 4.  colaborador ativo
 5.  participacao: não bloqueado
 6.  RT cruzada
-7.  ausência no dia
+7.  ausência no dia (e no dia seguinte, se NOTURNO)
 8.  valida_descanso (FN-004)
 9.  limite do ciclo
 10. vagas
@@ -38,6 +38,27 @@ A ordem não é estética: define a prevenção de deadlock e a mensagem que o u
 Passos 6–10 vão do mais específico ao mais genérico, para que o usuário receba o motivo mais
 informativo. Quem é da RT1 tentando RT2 com cruzada desligada deve ver `CRUZADA_BLOQUEADA`,
 não `SEM_VAGA` — mesmo que ambos sejam verdade.
+
+### Passo 7 — ausência no dia (RN-16 estendida)
+
+Um plantão NOTURNO (ex.: 19:00 → 07:00 do dia seguinte) "vaza" para a madrugada do dia
+seguinte. Checar só `escala_dia.data = plantao.data` (dia nominal do plantão) deixa passar
+uma extra que termina dentro de um dia de folga/férias registrado no dia seguinte — o
+colaborador estaria de folga às 6h da manhã, cobrindo até 7h. Por isso o passo 7 varre os
+dois dias candidatos, não só um:
+
+```sql
+e.data IN (v_plantao.data, CASE WHEN v_plantao.tipo = 'NOTURNO' THEN v_plantao.data + 1 END)
+```
+
+Para `DIURNO` a segunda posição do `IN` é `NULL` e nunca casa com nada — comportamento
+idêntico ao de antes. Para `NOTURNO`, o dia seguinte entra na varredura. `EXISTS` (em vez de
+`SELECT ... INTO`) porque agora pode haver até duas linhas candidatas; basta que **uma**
+delas seja ausência (qualquer código ≠ `D`) para bloquear, sujeito à mesma flag
+`permite_extra_em_folga` de sempre. Vale para qualquer código de ausência — o passo já era
+agnóstico ao código específico, só a janela de dias mudou. `FN-007` espelha exatamente este
+critério (mesma consulta) para que o motivo mostrado na grade nunca divirja do erro que
+`marcar_extra` lançaria.
 
 ## Implementação
 
@@ -49,7 +70,7 @@ CREATE OR REPLACE FUNCTION marcar_extra(
 ) RETURNS marcacao LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE
   v_plantao plantao%ROWTYPE; v_colab colaborador%ROWTYPE; v_ciclo ciclo%ROWTYPE;
-  v_part participacao_ciclo%ROWTYPE; v_escala escala_dia%ROWTYPE;
+  v_part participacao_ciclo%ROWTYPE;
   v_erro text; v_limite int; v_usadas int; v_cruzada boolean; v_result marcacao%ROWTYPE;
 BEGIN
   PERFORM pg_advisory_xact_lock(hashtextextended(p_colaborador_id::text, 0));
@@ -78,9 +99,13 @@ BEGIN
        v_part.permite_cruzada, v_plantao.permite_cruzada, v_ciclo.permite_cruzada, false)
      THEN RAISE EXCEPTION 'CRUZADA_BLOQUEADA'; END IF;
 
-  SELECT * INTO v_escala FROM escala_dia
-   WHERE colaborador_id = p_colaborador_id AND data = v_plantao.data;
-  IF FOUND AND v_escala.codigo <> 'D' AND NOT v_ciclo.permite_extra_em_folga
+  IF EXISTS (
+    SELECT 1
+      FROM escala_dia e JOIN codigo_escala ce ON ce.id = e.codigo_escala_id
+     WHERE e.colaborador_id = p_colaborador_id
+       AND e.data IN (v_plantao.data, CASE WHEN v_plantao.tipo = 'NOTURNO' THEN v_plantao.data + 1 END)
+       AND ce.codigo <> 'D'
+  ) AND NOT v_ciclo.permite_extra_em_folga
      THEN RAISE EXCEPTION 'EM_AUSENCIA'; END IF;
 
   v_erro := valida_descanso(p_colaborador_id, v_plantao.inicio_em, v_plantao.fim_em,
@@ -96,9 +121,8 @@ BEGIN
 
   IF v_plantao.vagas_ocupadas >= v_plantao.vagas_totais THEN RAISE EXCEPTION 'SEM_VAGA'; END IF;
 
-  INSERT INTO marcacao (id, plantao_id, colaborador_id, status, cruzada, origem, ip, user_agent)
-  VALUES (gen_random_uuid(), p_plantao_id, p_colaborador_id, 'CONFIRMADA', v_cruzada,
-          p_origem, p_ip, p_user_agent)
+  INSERT INTO marcacao (id, plantao_id, colaborador_id, status, cruzada, origem)
+  VALUES (gen_random_uuid(), p_plantao_id, p_colaborador_id, 'CONFIRMADA', v_cruzada, p_origem)
   RETURNING * INTO v_result;
 
   UPDATE plantao SET vagas_ocupadas = vagas_ocupadas + 1 WHERE id = p_plantao_id;
@@ -112,7 +136,10 @@ END $$;
 - **C:** `chk_vagas` e o índice único parcial pegam o que passar; nunca devem disparar.
 - **I:** advisory lock por colaborador (limite e jornada) + `FOR UPDATE` no plantão (vagas).
   Ordem fixa previne deadlock. Ver anomalias A1–A6 em `SEC-ACID`.
-- **D:** `audit_log` gravado pelo chamador **na mesma transação** (`AUD-2`).
+- **D:** `audit_log` gravado pelo chamador **na mesma transação** (`AUD-2`). `marcacao` não
+  tem colunas `ip`/`user_agent` — os parâmetros `p_ip`/`p_user_agent` não são gravados dentro
+  desta função; ficam disponíveis para o chamador usar no `INSERT INTO audit_log` (que tem
+  essas colunas).
 
 ## Por que a leitura do ciclo fica dentro
 
@@ -145,6 +172,8 @@ Todos → HTTP `409`. Mapeamento em `03-banco/constraints.md`.
 | F5-6 | Cruzada liberada só na `participacao` | permitido |
 | F5-7 | Dia com `F`, flag desligada | `EM_AUSENCIA` |
 | F5-8 | Dia com `F`, flag ligada | permitido |
+| F5-7b | NOTURNO na véspera de dia com ausência (D+1), flag desligada | `EM_AUSENCIA` |
+| F5-7c | DIURNO na véspera de dia com ausência (não cruza meia-noite) | permitido |
 | F5-9 | Mesmo turno do plantão base | `CONFLITO_DE_HORARIO` |
 | F5-10 | Turno adjacente | permitido |
 | F5-11 | Ciclo fechado no meio | `CICLO_FECHADO`, sem linha órfã |

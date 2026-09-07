@@ -2,7 +2,7 @@
 
 - **ID:** API-AUTH-004
 - **Status:** PRONTA
-- **Ator:** Colaborador
+- **Ator:** Público (lê o cookie de sessão se houver — não exige sessão válida)
 - **Pré-requisitos:** `API-AUTH-002`
 - **Entregáveis:** `src/app/api/auth/colaborador/logout/route.ts`
 
@@ -20,7 +20,13 @@ Cookie expirado via `Set-Cookie` com `Max-Age=0`.
 
 ## Autorização
 
-Sessão válida. Sem sessão, responde 204 assim mesmo — logout é idempotente.
+Rota pública no pipeline (`ator: 'PUBLICO'` em `defineHandler` — se fosse `'COLABORADOR'`,
+o pipeline recusaria com 401 justamente o caso "sem sessão" que este endpoint precisa
+aceitar). A rota lê o cookie `sessao_colaborador` diretamente de `request.cookies` e delega
+a revogação, idempotente por construção, a `processarLogout`. Sem sessão, responde 204 assim
+mesmo — logout é idempotente. É a única rota de `04-api/*` com essa forma "sessão opcional,
+mas eu leio se tiver"; se o padrão se repetir em outra rota, vale formalizar um ator
+`'OPCIONAL'` no contrato comum.
 
 ## Fluxo
 

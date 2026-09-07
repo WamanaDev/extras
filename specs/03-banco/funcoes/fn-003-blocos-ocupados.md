@@ -22,7 +22,7 @@ CREATE OR REPLACE FUNCTION blocos_ocupados(
 LANGUAGE sql STABLE AS $$
   SELECT e.inicio_em, e.fim_em, 'ESCALA'::text, e.id
     FROM escala_dia e
-    JOIN codigo_escala ce ON ce.codigo = e.codigo
+    JOIN codigo_escala ce ON ce.id = e.codigo_escala_id
    WHERE e.colaborador_id = p_colaborador_id
      AND (ce.presenca OR ce.ocupa_horario)
      AND e.inicio_em < p_ate AND e.fim_em > p_de
@@ -51,6 +51,9 @@ com `plantao`. Isso mantém a consulta indexável por `idx_marcacao_ocupacao`.
 ## Desempenho
 
 Usa `idx_escala_ocupacao` e `idx_marcacao_ocupacao`. Alvo: < 10 ms com 15.000 linhas.
+
+(Nota: `escala_dia` não guarda o código como texto — o join é por `codigo_escala_id`,
+FK para `codigo_escala.id`; sincronizado com o schema real.)
 Chamada em laço por `FN-007` para o ciclo inteiro — se virar gargalo, a otimização é
 materializar a janela do ciclo uma vez em CTE, não indexar mais.
 

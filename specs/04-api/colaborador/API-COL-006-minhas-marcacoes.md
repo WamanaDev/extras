@@ -16,10 +16,15 @@ Histórico de extras do ator no ciclo, incluindo canceladas.
 ```ts
 {
   marcacoes: Array<{ id, data, tipo, rt, horaInicio, horaFim, status, cruzada,
-                     criadoEm, canceladoEm, podeCancelar: boolean }>,
+                     criadoEm, canceladoEm, podeCancelar: boolean,
+                     cancelamentoPendente: boolean }>,
   totais: { confirmadas, canceladas, horas }
 }
 ```
+`cancelamentoPendente` é `true` quando já existe uma `solicitacao_cancelamento` `PENDENTE`
+para a marcação (`API-COL-005` não cancela mais direto, só abre um pedido — ver
+`API-ADM-MAR-004`). `podeCancelar` passa a considerar isso: `false` também quando há pedido
+pendente, não só fora da janela ou marcação já `CANCELADA`.
 
 ## Autorização
 
@@ -28,7 +33,9 @@ Ator da sessão.
 ## Fluxo
 
 1. Listar marcações do ator no ciclo
-2. Calcular `podeCancelar` (janela + status)
+2. Buscar `solicitacao_cancelamento` `PENDENTE` das marcações listadas
+3. Calcular `podeCancelar` (janela + status + ausência de pedido pendente) e
+   `cancelamentoPendente`
 
 ## ACID
 
@@ -48,3 +55,5 @@ Leitura simples.
 | 2 | Fora da janela | `podeCancelar = false` |
 | 3 | Marcação de terceiro | não aparece |
 | 4 | Canceladas em `totais.horas` | não contam |
+| 5 | Marcação com pedido `PENDENTE` | `podeCancelar = false`, `cancelamentoPendente = true` |
+| 6 | Pedido `RECUSADA` (não `PENDENTE`) | `podeCancelar` volta a `true` se ainda na janela |

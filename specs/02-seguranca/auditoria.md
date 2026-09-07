@@ -26,6 +26,9 @@ Sem isso, "não fui eu que marquei" é indiscutível.
 | `PLANTAO_CRIADO` / `ALTERADO` / `REMOVIDO` | Admin | antes → depois |
 | `COLABORADOR_CRIADO` / `ALTERADO` / `DESATIVADO` | Admin | campos alterados (sem PIN) |
 | `EXPORTACAO_DADOS` | Admin | escopo, formato, nº de registros |
+| `LOGOUT` | Colaborador | — |
+| `LOGIN_ADMIN_SUCESSO` / `LOGIN_ADMIN_FALHA` | Admin | e-mail, motivo (na falha) |
+| `CONTA_DESBLOQUEADA` | Admin | reaproveita `COLABORADOR_ALTERADO` com `payload.acaoEspecifica: 'CONTA_DESBLOQUEADA'` (evento mais próximo — desbloqueio é mudança de estado da conta) |
 
 `EXPORTACAO_DADOS` importa: exportação em massa é o caminho mais silencioso para vazamento.
 
