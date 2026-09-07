@@ -440,14 +440,18 @@ export async function listarAdministracoes(prisma: PrismaClient, pacienteId: str
 
   return administracoes.map((a) => ({
     id: a.id,
+    prescricaoId: a.prescricaoId,
     medicamentoNome: a.prescricao.medicamento.nome,
     dose: a.prescricao.dose,
     horarioPrevisto: a.horarioPrevisto?.toISOString() ?? null,
     status: a.status,
+    separadoPorId: a.separadoPorId,
     separadoPorNome: a.separadoPor?.nome ?? null,
     separadoEm: a.separadoEm?.toISOString() ?? null,
+    conferidoPorId: a.conferidoPorId,
     conferidoPorNome: a.conferidoPor?.nome ?? null,
     conferidoEm: a.conferidoEm?.toISOString() ?? null,
+    administradoPorId: a.administradoPorId,
     administradoPorNome: a.administradoPor?.nome ?? null,
     administradoEm: a.administradoEm?.toISOString() ?? null,
     observacao: a.observacao,
