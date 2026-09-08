@@ -49,9 +49,13 @@ function parseCsv(texto: string): string[] {
     .filter((linha) => linha.length > 0);
 }
 
-function criarHandlerImportar(prisma: PrismaClient) {
+export function criarHandlerImportar(prisma: PrismaClient) {
   return defineHandler({
     ator: 'ADMIN',
+    // Upload de CSV — a única rota do app que legitimamente precisa de
+    // `multipart/form-data`. Ver docstring de `verificarCsrf` (`src/server/http/csrf.ts`):
+    // a defesa CSRF continua sendo o header `X-Requested-With`, não o Content-Type.
+    permitirMultipart: true,
     handler: async ({ ator, ctx, request }) => {
       let formData: FormData;
       try {

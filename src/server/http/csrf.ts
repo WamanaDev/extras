@@ -21,10 +21,25 @@ const CONTENT_TYPES_PROIBIDOS_EM_MUTACAO = [
  * Verifica os dois requisitos de CSRF para uma rota de mutação
  * (`POST`/`PUT`/`PATCH`/`DELETE`). Retorna o motivo da recusa quando aplicável,
  * para o handler decidir a mensagem — nunca lança.
+ *
+ * `permitirMultipart` (default `false`): rejeitar `multipart/form-data`
+ * incondicionalmente bloqueava a ÚNICA rota do app que legitimamente precisa
+ * dele — `POST /api/admin/colaboradores/importar` (upload de CSV) sempre
+ * devolvia 403, mesmo com o header `X-Requested-With` correto (achado em uso
+ * real, "importação em lote não funciona"). A defesa contra CSRF aqui é o
+ * header `X-Requested-With: fetch` (uma submissão de `<form>` cross-site não
+ * consegue setar headers customizados, com ou sem multipart) — bloquear
+ * `application/x-www-form-urlencoded` continua incondicional (é exatamente o
+ * Content-Type que um `<form>` HTML simples envia sem JS). Rotas que
+ * precisam de upload de arquivo passam `permitirMultipart: true`
+ * explicitamente; todas as outras mantêm o bloqueio de antes.
  */
-export function verificarCsrf(headers: Headers): ResultadoCsrf {
+export function verificarCsrf(headers: Headers, opcoes: { permitirMultipart?: boolean } = {}): ResultadoCsrf {
   const contentType = (headers.get('content-type') ?? '').toLowerCase();
-  if (CONTENT_TYPES_PROIBIDOS_EM_MUTACAO.some((proibido) => contentType.includes(proibido))) {
+  const proibidos = opcoes.permitirMultipart
+    ? CONTENT_TYPES_PROIBIDOS_EM_MUTACAO.filter((proibido) => proibido !== 'multipart/form-data')
+    : CONTENT_TYPES_PROIBIDOS_EM_MUTACAO;
+  if (proibidos.some((proibido) => contentType.includes(proibido))) {
     return { ok: false, motivo: 'CONTENT_TYPE_PROIBIDO' };
   }
 
