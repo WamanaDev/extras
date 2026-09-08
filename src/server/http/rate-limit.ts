@@ -46,13 +46,15 @@ export type EscopoRateLimit =
   | 'login_admin_ip' // 20 tentativas / 15 min
   | 'marcacoes_por_sessao' // 10 / min
   | 'leitura_por_sessao' // 120 / min
-  | 'global_por_ip'; // 300 / min
+  | 'global_por_ip' // 300 / min
+  | 'cron_ip'; // 20 / min — ver comentário em LIMITES
 
 /** Escopos que devem falhar **fechado** se o Redis estiver indisponível (login = segurança). */
 const ESCOPOS_FALHA_FECHADA = new Set<EscopoRateLimit>([
   'login_matricula',
   'login_matricula_acumulado',
   'login_ip',
+  'cron_ip',
   'login_ip_acumulado',
   'login_admin_email',
   'login_admin_ip',
@@ -73,6 +75,16 @@ const LIMITES: Record<EscopoRateLimit, ConfigLimite> = {
   marcacoes_por_sessao: { limite: 10, janelaSegundos: 60 },
   leitura_por_sessao: { limite: 120, janelaSegundos: 60 },
   global_por_ip: { limite: 300, janelaSegundos: 60 },
+  /**
+   * `/api/cron/*` (webhook interno, `CRON_SECRET` — não passa por `defineHandler`,
+   * ver `src/server/http/cron-auth.ts`). Pedido do usuário: reforçar contra
+   * força bruta do segredo, já que o workflow do GitHub Actions que chama
+   * essas rotas fica num repositório público (o `.yml` — schedule e URL —
+   * é visível; só o valor do segredo é mascarado pelo GitHub). 20/min é
+   * generoso pro uso legítimo (1 chamada a cada 5 min, mais retries) e
+   * apertado pra qualquer tentativa de adivinhar o segredo por IP.
+   */
+  cron_ip: { limite: 20, janelaSegundos: 60 },
 };
 
 export function falhaFechadaPara(escopo: EscopoRateLimit): boolean {

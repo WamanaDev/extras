@@ -16,6 +16,11 @@ vi.mock('@/server/db/client', () => ({
   obterPrisma: async () => ({}),
 }));
 
+const verificarRateLimitMock = vi.fn();
+vi.mock('@/server/http/rate-limit', () => ({
+  verificarRateLimit: (...args: unknown[]) => verificarRateLimitMock(...args),
+}));
+
 function req(url: string, headers: Record<string, string> = {}): NextRequest {
   return new NextRequest(new URL(url, 'http://localhost'), { headers });
 }
@@ -25,6 +30,8 @@ let GET: typeof import('./route').GET;
 beforeEach(async () => {
   vi.resetModules();
   process.env.CRON_SECRET = 'segredo-de-teste';
+  verificarRateLimitMock.mockReset();
+  verificarRateLimitMock.mockResolvedValue({ permitido: true, limite: 20, restante: 19, retryAfter: 0 });
   enviarLembretesMock.mockReset();
   enviarLembretesMock.mockResolvedValue({ turno: 'NOTURNO', dataAlvo: '2026-09-08', notificadas: 1, jaNotificadas: 0 });
   GET = (await import('./route')).GET;
@@ -59,6 +66,14 @@ describe('GET /api/cron/lembrete-extra', () => {
     expect(response.status).toBe(200);
     expect(enviarLembretesMock).toHaveBeenCalledWith(expect.anything(), 'NOTURNO', expect.any(Date));
     expect(await response.json()).toEqual({ turno: 'NOTURNO', dataAlvo: '2026-09-08', notificadas: 1, jaNotificadas: 0 });
+  });
+
+  it('rate limit estourado → 429, nunca chama enviarLembretesDeExtra', async () => {
+    verificarRateLimitMock.mockResolvedValue({ permitido: false, limite: 20, restante: 0, retryAfter: 30 });
+    const response = await GET(req('http://localhost/api/cron/lembrete-extra?turno=NOTURNO', { authorization: 'Bearer segredo-de-teste' }));
+    expect(response.status).toBe(429);
+    expect(response.headers.get('Retry-After')).toBe('30');
+    expect(enviarLembretesMock).not.toHaveBeenCalled();
   });
 
   it('falha interna → 500 ERRO_INTERNO, nunca vaza o erro bruto', async () => {

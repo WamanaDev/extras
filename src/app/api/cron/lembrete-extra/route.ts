@@ -15,21 +15,22 @@
  * disparado pela própria plataforma, autenticado por segredo compartilhado
  * (`CRON_SECRET`), não por sessão. Nenhum dos quatro tipos de `ator` do
  * contrato comum (`PUBLICO`/`COLABORADOR`/`ADMIN`/`QUALQUER`) modela isso.
+ *
+ * Autenticação (rate limit + comparação em tempo constante) em
+ * `src/server/http/cron-auth.ts` — mesmo módulo usado por
+ * `alertas-medicamento/route.ts`, ver docstring lá para o porquê do reforço.
  */
 import { NextResponse, type NextRequest } from 'next/server';
 import { obterPrisma } from '@/server/db/client';
 import { redigirParaLog } from '@/server/log/redact';
+import { autorizarCron } from '@/server/http/cron-auth';
 import { enviarLembretesDeExtra, type TurnoLembrete } from '@/server/notificacoes/lembrete-extra';
 
-function autorizado(request: NextRequest): boolean {
-  const segredo = process.env.CRON_SECRET;
-  if (!segredo) return false;
-  return request.headers.get('authorization') === `Bearer ${segredo}`;
-}
-
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  if (!autorizado(request)) {
-    return NextResponse.json({ erro: 'NAO_AUTENTICADO', mensagem: 'Token de cron ausente ou inválido.' }, { status: 401 });
+  const auth = await autorizarCron(request);
+  if (!auth.ok) {
+    const headers = auth.retryAfter !== undefined ? { 'Retry-After': String(auth.retryAfter) } : undefined;
+    return NextResponse.json({ erro: auth.status === 429 ? 'LIMITE_EXCEDIDO' : 'NAO_AUTENTICADO', mensagem: auth.mensagem }, { status: auth.status, ...(headers ? { headers } : {}) });
   }
 
   const turnoBruto = request.nextUrl.searchParams.get('turno');
