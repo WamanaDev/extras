@@ -1,6 +1,9 @@
 /**
- * API-MED-001 (`GET`) / API-MED-002 (`POST`) — `/api/pacientes/:pacienteId/prescricoes`.
- * Ator colaborador (qualquer um da RT do paciente) — RNP-13.
+ * API-MED-001 (`GET`) / API-MED-002 (`POST`) — `/api/pacientes/:id/prescricoes`.
+ * Ator colaborador (qualquer um da RT do paciente) — RNP-13. Parâmetro `id`
+ * (não `pacienteId`) — Next.js exige o mesmo nome de slug em toda rota
+ * dinâmica irmã sob `api/pacientes/*` (`[id]` já usado por
+ * `GET /api/pacientes/:id`).
  */
 import { z } from 'zod';
 import { defineHandler } from '@/server/http/handler';
@@ -9,7 +12,7 @@ import { listarPrescricoes, criarPrescricao } from '@/server/services/pacientes/
 import { obterRtDoColaborador } from '@/server/services/pacientes/contexto';
 import { erroNaoEncontrado } from '@/server/http/erros';
 
-const ParamsSchema = z.object({ pacienteId: z.string().uuid() });
+const ParamsSchema = z.object({ id: z.string().uuid() });
 const ListarQuerySchema = z.object({ status: z.enum(['ATIVA', 'SUSPENSA', 'ENCERRADA']).optional() });
 
 export const GET = defineHandler({
@@ -21,7 +24,7 @@ export const GET = defineHandler({
   handler: async ({ params, query, ator }) => {
     const prisma = await obterPrisma();
     const rtId = await obterRtDoColaborador(prisma, ator.colaboradorId);
-    return listarPrescricoes(prisma, params.pacienteId, rtId, query.status);
+    return listarPrescricoes(prisma, params.id, rtId, query.status);
   },
 });
 
@@ -52,11 +55,11 @@ export const POST = defineHandler({
     const prisma = await obterPrisma();
     if (ator.tipo === 'COLABORADOR') {
       const rtId = await obterRtDoColaborador(prisma, ator.colaboradorId);
-      return criarPrescricao(prisma, params.pacienteId, rtId, body, { colaboradorId: ator.colaboradorId }, ctx);
+      return criarPrescricao(prisma, params.id, rtId, body, { colaboradorId: ator.colaboradorId }, ctx);
     }
     // Admin: sem escopo de RT — pode registrar para paciente de qualquer unidade.
-    const paciente = await prisma.paciente.findUnique({ where: { id: params.pacienteId }, select: { rtId: true } });
+    const paciente = await prisma.paciente.findUnique({ where: { id: params.id }, select: { rtId: true } });
     if (!paciente) throw erroNaoEncontrado('Paciente não encontrado.');
-    return criarPrescricao(prisma, params.pacienteId, paciente.rtId, body, { adminId: ator.adminId }, ctx);
+    return criarPrescricao(prisma, params.id, paciente.rtId, body, { adminId: ator.adminId }, ctx);
   },
 });
