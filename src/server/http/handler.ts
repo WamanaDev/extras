@@ -369,7 +369,7 @@ const dependenciasPadrao: DependenciasHandler = {
 // ----------------------------------------------------------------------------
 
 /** `ip` de `x-forwarded-for` (proxy da Vercel) — primeiro endereço da lista é o cliente. Nunca lê outro header (`contrato-comum.md`, "Contexto"). */
-function extrairIp(headers: Headers): string {
+export function extrairIp(headers: Headers): string {
   const xff = headers.get('x-forwarded-for');
   if (!xff) return 'desconhecido';
   return xff.split(',')[0]?.trim() || 'desconhecido';
