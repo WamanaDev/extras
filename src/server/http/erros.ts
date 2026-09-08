@@ -112,7 +112,43 @@ export type CodigoErroNegocio =
   // não é atribuível a `CodigoErro`). Nenhum código removido/redefinido.
   | 'COLABORADOR_BLOQUEADO'
   | 'CONFLITO_DE_HORARIO'
-  | 'SEM_VAGA';
+  | 'SEM_VAGA'
+  /**
+   * Módulo de pacientes (branch `pacientes`, specs `04-api/{admin-pacientes,
+   * pacientes,agendamentos,medicamentos}/*`, `03-banco/funcoes/fn-01{0..6}-*`).
+   * Extensão aditiva, mesmo padrão do bloco acima — nenhum código
+   * removido/redefinido. `MOTIVO_OBRIGATORIO` e `CONFLITO_DE_HORARIO` já
+   * existentes são reaproveitados (cancelar agendamento/encerrar prescrição;
+   * checagem de sobreposição de agenda usa `CONFLITO_AGENDA_PACIENTE`
+   * próprio porque a mensagem é específica de paciente, não de plantão).
+   */
+  | 'PACIENTE_INDISPONIVEL'
+  | 'INTERVALO_INVALIDO'
+  | 'AGENDAMENTO_RETROATIVO'
+  | 'AGENDAMENTO_INEXISTENTE'
+  | 'AGENDAMENTO_JA_ENCERRADO'
+  | 'AGENDAMENTO_NAO_FINALIZAVEL'
+  | 'CONFLITO_AGENDA_PACIENTE'
+  | 'RT_INVALIDA'
+  | 'CPF_JA_CADASTRADO'
+  | 'MEDICAMENTO_INEXISTENTE'
+  | 'HORARIOS_OBRIGATORIOS'
+  | 'VIGENCIA_INCONSISTENTE'
+  | 'VIGENCIA_MUITO_LONGA'
+  | 'PRESCRICAO_NAO_ATIVA'
+  | 'PRESCRICAO_INATIVA'
+  | 'CAMPO_IMUTAVEL'
+  | 'FORA_DA_VIGENCIA'
+  | 'HORARIO_PREVISTO_OBRIGATORIO'
+  | 'PRESCRICAO_PRN_SEM_HORARIO'
+  | 'DOSE_NAO_PREVISTA'
+  | 'DOSE_JA_SEPARADA'
+  | 'ADMINISTRACAO_INEXISTENTE'
+  | 'DOSE_NAO_SEPARADA'
+  | 'CONFERENTE_IGUAL_SEPARADOR'
+  | 'JUSTIFICATIVA_OBRIGATORIA'
+  | 'DOSE_NAO_CONFERIDA'
+  | 'ADMINISTRADOR_NAO_PARTICIPOU';
 
 /** União completa de códigos que podem aparecer no campo `erro` da resposta (`CONVENTIONS.md`, "Envelope de resposta"). `SCREAMING_SNAKE`, sem acento. */
 export type CodigoErro = CodigoErroInfra | CodigoErroNegocio | ErroApi;

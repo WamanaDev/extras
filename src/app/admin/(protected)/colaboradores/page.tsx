@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { Download } from 'lucide-react';
 import { useListaApi, useRecursoApi } from '@/lib/api/use-recurso';
 import { EstadoCarregando, EstadoErro, EstadoVazio } from '@/components/admin/Estado';
 import { Badge } from '@/components/ui/badge';
@@ -84,6 +85,34 @@ export default function ColaboradoresPage(): JSX.Element {
     if (!preview) colaboradores.recarregar();
   }
 
+  /**
+   * Modelo de CSV pra download — as colunas `rt`/`turno`/`ancora` já são
+   * texto (nome da RT, DIURNO/NOTURNO, AAAA-MM-DD), nunca UUID (a rota de
+   * importação resolve a RT pelo nome, case-insensitive — ver
+   * `src/app/api/admin/colaboradores/importar/route.ts`). Gera uma linha de
+   * exemplo por RT cadastrada (até 2) pra já mostrar nomes reais de RT;
+   * sem cabeçalho — o parser da importação trata toda linha não vazia como
+   * dado, não pula a primeira.
+   */
+  function baixarModeloCsv(): void {
+    const rtsExemplo = (rts.dados?.itens ?? []).slice(0, 2);
+    const nomesExemplo = rtsExemplo.length > 0 ? rtsExemplo.map((rt) => rt.nome) : ['RT1', 'RT2'];
+    const hoje = new Date().toISOString().slice(0, 10);
+    const linhas = nomesExemplo.map(
+      (nomeRt, indice) => `00000${indice + 1};Nome Completo ${indice + 1};${nomeRt};${indice % 2 === 0 ? 'DIURNO' : 'NOTURNO'};${hoje}`,
+    );
+    const conteudo = `${linhas.join('\r\n')}\r\n`;
+    const blob = new Blob([conteudo], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'modelo-colaboradores.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-semibold text-slate-900">Colaboradores</h1>
@@ -147,7 +176,18 @@ export default function ColaboradoresPage(): JSX.Element {
 
       <section className="rounded-lg border border-slate-200 bg-white p-4">
         <h2 className="mb-3 text-sm font-semibold text-slate-900">Importar em lote (CSV)</h2>
-        <p className="mb-2 text-sm text-slate-600">Formato: matricula;nome;rt;turno;ancora — uma linha por colaborador.</p>
+        <p className="mb-1 text-sm text-slate-600">Formato: matricula;nome;rt;turno;ancora — uma linha por colaborador, sem cabeçalho.</p>
+        <p className="mb-2 text-xs text-slate-500">
+          <code className="rounded bg-slate-100 px-1 py-0.5">rt</code> é o <strong>nome</strong> da RT (ex.: RT1) —
+          não o ID. <code className="rounded bg-slate-100 px-1 py-0.5">turno</code> é DIURNO ou NOTURNO.{' '}
+          <code className="rounded bg-slate-100 px-1 py-0.5">ancora</code> é a data no formato AAAA-MM-DD.
+        </p>
+        <div className="mb-3">
+          <Button type="button" variant="outline" size="sm" onClick={baixarModeloCsv}>
+            <Download className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+            Baixar modelo CSV
+          </Button>
+        </div>
         <div className="flex flex-wrap items-center gap-3">
           <input
             type="file"

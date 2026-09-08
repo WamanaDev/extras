@@ -4,7 +4,7 @@
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
-import { LayoutDashboard, CalendarDays, CalendarRange, ListChecks, LogOut } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, CalendarRange, ListChecks, LogOut, Users, HeartPulse } from 'lucide-react';
 import { post } from '@/lib/api/client';
 import { Button } from '@/components/ui/button';
 import { SinoNotificacoes } from '@/components/notificacoes/SinoNotificacoes';
@@ -23,6 +23,9 @@ const LINKS = [
   { href: '/minha-escala-calendario', rotulo: 'Escala', Icone: CalendarDays },
   { href: '/plantoes-calendario', rotulo: 'Extras', Icone: CalendarRange },
   { href: '/minhas-extras', rotulo: 'Minhas extras', Icone: ListChecks },
+  // Módulo de pacientes (FUND-005/FE-003) — cuidado com paciente da própria RT.
+  { href: '/pacientes', rotulo: 'Pacientes', Icone: Users },
+  { href: '/agenda-rt', rotulo: 'Agenda RT', Icone: HeartPulse },
 ] as const;
 
 function iniciais(nome: string): string {

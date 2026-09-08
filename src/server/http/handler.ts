@@ -324,6 +324,8 @@ export interface ConfigHandler<
    * anterior (`200`) em toda rota já escrita.
    */
   statusSucesso?: number;
+  /** Permite `Content-Type: multipart/form-data` em mutação (default `false`) — ver docstring de `verificarCsrf`. Só para rotas de upload de arquivo (ex.: `POST /api/admin/colaboradores/importar`). */
+  permitirMultipart?: boolean;
   handler: (entrada: EntradaHandler<TAtor, TBody, TQuery, TParams>) => Promise<unknown>;
 }
 
@@ -423,7 +425,10 @@ export function criarDefineHandler(dependenciasParciais: Partial<DependenciasHan
       try {
         // --- CSRF (mutação) — X-Requested-With obrigatório, SEC-INT -------
         if (METODOS_MUTACAO.has(request.method)) {
-          const resultadoCsrf = verificarCsrf(request.headers);
+          const resultadoCsrf = verificarCsrf(
+            request.headers,
+            config.permitirMultipart !== undefined ? { permitirMultipart: config.permitirMultipart } : {},
+          );
           if (!resultadoCsrf.ok) {
             throw erroDeCsrf(resultadoCsrf.motivo);
           }
