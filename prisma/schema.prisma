@@ -120,11 +120,6 @@ model Rt {
   colaboradores Colaborador[]
   plantoes      Plantao[]
 
-  /// Módulo de pacientes (DB-006) — pacientes[]/agendamentos[] adicionados
-  /// por 20260907140000_pacientes_tabelas.
-  pacientes    Paciente[]
-  agendamentos Agendamento[]
-
   @@map("rt")
 }
 
@@ -184,25 +179,16 @@ model Colaborador {
 
   rt Rt @relation(fields: [rtId], references: [id], onDelete: Restrict)
 
-  escalasDia               EscalaDia[]
-  marcacoes                Marcacao[]
-  trocasEscala             TrocaEscala[]             @relation("TrocaEscalaColaborador")
-  sessoes                  SessaoColaborador[]
-  tentativasLogin          TentativaLogin[]
-  participacoes            ParticipacaoCiclo[]
-  notificacoes             Notificacao[]
-  pushSubscriptions        PushSubscription[]
-  googleCalendarConta      GoogleCalendarConta?
+  escalasDia        EscalaDia[]
+  marcacoes         Marcacao[]
+  trocasEscala      TrocaEscala[]       @relation("TrocaEscalaColaborador")
+  sessoes           SessaoColaborador[]
+  tentativasLogin   TentativaLogin[]
+  participacoes     ParticipacaoCiclo[]
+  notificacoes      Notificacao[]
+  pushSubscriptions PushSubscription[]
+  googleCalendarConta GoogleCalendarConta?
   solicitacoesCancelamento SolicitacaoCancelamento[]
-
-  /// Módulo de pacientes (DB-006), checagem dupla (RNP-25..27) —
-  /// adicionados por 20260907140000_pacientes_tabelas.
-  agendamentosCriados      Agendamento[]              @relation("AgendamentoCriador")
-  agendamentosAcompanhados Agendamento[]              @relation("AgendamentoAcompanhante")
-  prescricoesCriadas       Prescricao[]               @relation("PrescricaoCriador")
-  administracoesSeparadas  AdministracaoMedicamento[] @relation("AdministracaoSeparador")
-  administracoesConferidas AdministracaoMedicamento[] @relation("AdministracaoConferente")
-  administracoesFeitas     AdministracaoMedicamento[] @relation("AdministracaoAdministrador")
 
   @@map("colaborador")
 }
@@ -375,18 +361,18 @@ enum StatusSolicitacaoCancelamento {
 }
 
 model SolicitacaoCancelamento {
-  id              String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  marcacaoId      String                        @map("marcacao_id") @db.Uuid
-  colaboradorId   String                        @map("colaborador_id") @db.Uuid
+  id            String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  marcacaoId    String                        @map("marcacao_id") @db.Uuid
+  colaboradorId String                        @map("colaborador_id") @db.Uuid
   /// Por que o colaborador quer cancelar — obrigatório, é o que o admin vê antes de decidir.
-  motivo          String
-  status          StatusSolicitacaoCancelamento @default(PENDENTE)
+  motivo        String
+  status        StatusSolicitacaoCancelamento @default(PENDENTE)
   /// Preenchido pelo admin ao resolver — obrigatório numa recusa (explica o "não" pro colaborador), opcional numa aprovação.
-  motivoResolucao String?                       @map("motivo_resolucao")
+  motivoResolucao String?   @map("motivo_resolucao")
   /// Admin que aprovou/recusou (uuid de `auth.users`, sem FK — mesmo padrão de `troca_escala.criadoPorId`; qualquer admin serve, não um específico).
-  resolvidoPorId  String?                       @map("resolvido_por_id") @db.Uuid
-  resolvidoEm     DateTime?                     @map("resolvido_em") @db.Timestamptz(6)
-  criadoEm        DateTime                      @default(now()) @map("criado_em") @db.Timestamptz(6)
+  resolvidoPorId  String?   @map("resolvido_por_id") @db.Uuid
+  resolvidoEm     DateTime? @map("resolvido_em") @db.Timestamptz(6)
+  criadoEm        DateTime  @default(now()) @map("criado_em") @db.Timestamptz(6)
 
   marcacao    Marcacao    @relation(fields: [marcacaoId], references: [id], onDelete: Cascade)
   colaborador Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Cascade)
@@ -552,251 +538,4 @@ model GoogleCalendarConta {
   colaborador Colaborador @relation(fields: [colaboradorId], references: [id], onDelete: Cascade)
 
   @@map("google_calendar_conta")
-}
-
-// ----------------------------------------------------------------------------
-// Módulo de pacientes (DB-006, specs/03-banco/modelo-dados-pacientes.md) —
-// cuidado com paciente por RT: cadastro (admin), agendamento — consulta/saída
-// (colaborador), medicação com checagem dupla — separar/conferir/administrar
-// (colaborador). Ver specs/00-fundacao/visao-geral-pacientes.md (FUND-005) e
-// specs/01-dominio/regras-negocio-pacientes.md (RNP-*) para o racional de
-// cada campo. Migration: 20260907140000_pacientes_tabelas.
-// ----------------------------------------------------------------------------
-
-enum StatusPaciente {
-  ATIVO
-  INATIVO
-
-  @@map("status_paciente")
-}
-
-enum TipoAgendamento {
-  CONSULTA
-  SAIDA
-
-  @@map("tipo_agendamento")
-}
-
-/// RNP-10: concluir só depois de fim_em. RNP-08/09: cancelar exige motivo e permissão.
-enum StatusAgendamento {
-  AGENDADO
-  CONFIRMADO
-  REALIZADO
-  CANCELADO
-  NAO_COMPARECEU
-
-  @@map("status_agendamento")
-}
-
-/// Mesmo racional de OrigemMarcacao — admin pode agir por terceiros.
-enum OrigemAgendamento {
-  COLABORADOR
-  ADMIN
-
-  @@map("origem_agendamento")
-}
-
-/// Frequência da prescrição — RNP-16, RNP-29 (PRN segue a mesma checagem dupla).
-enum TipoPrescricao {
-  REGULAR
-  PRN
-
-  @@map("tipo_prescricao")
-}
-
-/// Vigência da prescrição — RNP-24. DEFINITIVA: sem data_fim, contínua até
-/// suspensão manual. TEMPORARIA: data_fim obrigatória.
-enum DuracaoPrescricao {
-  DEFINITIVA
-  TEMPORARIA
-
-  @@map("duracao_prescricao")
-}
-
-enum OrigemPrescricao {
-  COLABORADOR
-  ADMIN
-
-  @@map("origem_prescricao")
-}
-
-enum StatusPrescricao {
-  ATIVA
-  SUSPENSA
-  ENCERRADA
-
-  @@map("status_prescricao")
-}
-
-/// Checagem dupla (RNP-25..28): PENDENTE → SEPARADO → CONFERIDO →
-/// ADMINISTRADO|RECUSADO, com desvio SEPARADO/CONFERIDO → DIVERGENTE (nova
-/// separação, linha divergente preservada). NAO_ADMINISTRADO é usado só
-/// quando uma prescrição é encerrada com doses futuras pendentes (API-MED-004).
-enum StatusAdministracao {
-  PENDENTE
-  SEPARADO
-  CONFERIDO
-  DIVERGENTE
-  ADMINISTRADO
-  RECUSADO
-  NAO_ADMINISTRADO
-
-  @@map("status_administracao")
-}
-
-/// Residente de uma RT sob cuidado — RNP-01: colaborador só vê/gerencia a
-/// própria RT, sem exceção "cruzada" (ao contrário de Marcacao/RN-19).
-model Paciente {
-  id                  String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  rtId                String         @map("rt_id") @db.Uuid
-  nome                String
-  dataNascimento      DateTime       @map("data_nascimento") @db.Date
-  cpf                 String?
-  nomeResponsavel     String?        @map("nome_responsavel")
-  contatoResponsavel  String?        @map("contato_responsavel")
-  /// Restrito — costuma conter condição clínica (SEC-SAUDE).
-  observacoesClinicas String?        @map("observacoes_clinicas")
-  status              StatusPaciente @default(ATIVO)
-  /// Admin que cadastrou (uuid de `auth.users`, sem FK — mesmo padrão de `troca_escala.criadoPorId`).
-  criadoPorId         String?        @map("criado_por_id") @db.Uuid
-  criadoEm            DateTime       @default(now()) @map("criado_em") @db.Timestamptz(6)
-  /// Tocado por trigger `tocar_atualizado_em` (DB-003, reaproveitado).
-  atualizadoEm        DateTime       @default(now()) @map("atualizado_em") @db.Timestamptz(6)
-
-  rt           Rt            @relation(fields: [rtId], references: [id], onDelete: Restrict)
-  agendamentos Agendamento[]
-  prescricoes  Prescricao[]
-
-  @@map("paciente")
-}
-
-/// Consulta ou saída — RNP-03: `rtId` é snapshot da RT do paciente na
-/// criação (não retroage se o paciente for transferido depois).
-model Agendamento {
-  id         String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  pacienteId String          @map("paciente_id") @db.Uuid
-  /// Snapshot — ver docstring do model. RNP-01/RNP-03.
-  rtId       String          @map("rt_id") @db.Uuid
-  tipo       TipoAgendamento
-  titulo     String
-  local      String?
-
-  inicioEm DateTime @map("inicio_em") @db.Timestamptz(6)
-  fimEm    DateTime @map("fim_em") @db.Timestamptz(6)
-
-  acompanhanteColaboradorId String? @map("acompanhante_colaborador_id") @db.Uuid
-
-  origem                 OrigemAgendamento
-  criadoPorColaboradorId String?           @map("criado_por_colaborador_id") @db.Uuid
-  /// Admin que criou (uuid de `auth.users`, sem FK), preenchido só quando `origem = ADMIN`.
-  criadoPorAdminId       String?           @map("criado_por_admin_id") @db.Uuid
-
-  status             StatusAgendamento @default(AGENDADO)
-  observacoes        String?
-  motivoCancelamento String?           @map("motivo_cancelamento")
-  canceladoEm        DateTime?         @map("cancelado_em") @db.Timestamptz(6)
-
-  criadoEm     DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
-  /// Tocado por trigger `tocar_atualizado_em` (DB-003, reaproveitado).
-  atualizadoEm DateTime @default(now()) @map("atualizado_em") @db.Timestamptz(6)
-
-  paciente             Paciente     @relation(fields: [pacienteId], references: [id], onDelete: Restrict)
-  rt                   Rt           @relation(fields: [rtId], references: [id], onDelete: Restrict)
-  acompanhante         Colaborador? @relation("AgendamentoAcompanhante", fields: [acompanhanteColaboradorId], references: [id], onDelete: SetNull)
-  criadoPorColaborador Colaborador? @relation("AgendamentoCriador", fields: [criadoPorColaboradorId], references: [id], onDelete: SetNull)
-
-  @@map("agendamento")
-}
-
-/// Catálogo de referência — mesmo racional de CodigoEscala: cadastro simples,
-/// sem deploy para adicionar item novo.
-model Medicamento {
-  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nome           String
-  principioAtivo String?  @map("principio_ativo")
-  ativo          Boolean  @default(true)
-  criadoEm       DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
-
-  prescricoes Prescricao[]
-
-  @@map("medicamento")
-}
-
-/// Receita — RNP-13: registrada por qualquer colaborador da RT do paciente
-/// (admin também pode). RNP-24: duracao define se dataFim é obrigatória.
-model Prescricao {
-  id            String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  pacienteId    String @map("paciente_id") @db.Uuid
-  medicamentoId String @map("medicamento_id") @db.Uuid
-
-  /// Frequência: horários fixos ou sob demanda.
-  tipo    TipoPrescricao
-  /// Vigência: contínua ou com fim definido — RNP-24.
-  duracao DuracaoPrescricao
-
-  dose     String
-  via      String
-  /// Formato HH:MM. Vazio quando `tipo = PRN` — DB-007 `chk_prescricao_horarios`.
-  horarios String[] @default([])
-
-  dataInicio DateTime  @map("data_inicio") @db.Date
-  /// Obrigatória quando `duracao = TEMPORARIA`; nula quando `DEFINITIVA` — DB-007 `chk_prescricao_duracao`.
-  dataFim    DateTime? @map("data_fim") @db.Date
-
-  prescritoPor String  @map("prescrito_por")
-  /// Restrito (SEC-SAUDE).
-  instrucoes   String?
-
-  status StatusPrescricao @default(ATIVA)
-
-  origem                 OrigemPrescricao
-  criadoPorColaboradorId String?          @map("criado_por_colaborador_id") @db.Uuid
-  /// Admin que registrou (uuid de `auth.users`, sem FK), só quando `origem = ADMIN`.
-  criadoPorAdminId       String?          @map("criado_por_admin_id") @db.Uuid
-
-  criadoEm     DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
-  /// Tocado por trigger `tocar_atualizado_em` (DB-003, reaproveitado).
-  atualizadoEm DateTime @default(now()) @map("atualizado_em") @db.Timestamptz(6)
-
-  paciente             Paciente                   @relation(fields: [pacienteId], references: [id], onDelete: Restrict)
-  medicamento          Medicamento                @relation(fields: [medicamentoId], references: [id], onDelete: Restrict)
-  criadoPorColaborador Colaborador?               @relation("PrescricaoCriador", fields: [criadoPorColaboradorId], references: [id], onDelete: SetNull)
-  administracoes       AdministracaoMedicamento[]
-
-  @@map("prescricao")
-}
-
-/// Uma linha por dose (prevista ou PRN), do início ao fim da checagem dupla
-/// (RNP-25): PENDENTE → SEPARADO → CONFERIDO → ADMINISTRADO|RECUSADO, com
-/// desvio para DIVERGENTE. Cada etapa grava seu próprio colaborador/horário,
-/// nunca reescrito depois (RNP-14, RNP-30) — histórico de fato, não de tabela.
-model AdministracaoMedicamento {
-  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  prescricaoId    String    @map("prescricao_id") @db.Uuid
-  /// Nulo para PRN — DB-007 `administracao_unica_prevista`.
-  horarioPrevisto DateTime? @map("horario_previsto") @db.Timestamptz(6)
-
-  status StatusAdministracao @default(PENDENTE)
-
-  /// Etapa 1 — RNP-25.
-  separadoPorId     String?   @map("separado_por_id") @db.Uuid
-  separadoEm        DateTime? @map("separado_em") @db.Timestamptz(6)
-  /// Etapa 2 — RNP-26: nunca igual a `separadoPorId` (DB-007 `chk_separador_conferente_distintos`).
-  conferidoPorId    String?   @map("conferido_por_id") @db.Uuid
-  conferidoEm       DateTime? @map("conferido_em") @db.Timestamptz(6)
-  /// Etapa 3 — RNP-27: sempre igual a `separadoPorId` OU `conferidoPorId` (DB-007 `chk_administrador_participou`).
-  administradoPorId String?   @map("administrado_por_id") @db.Uuid
-  administradoEm    DateTime? @map("administrado_em") @db.Timestamptz(6)
-
-  /// Obrigatória quando PRN, RECUSADO ou DIVERGENTE — RNP-17, DB-007 `chk_administracao_observacao`.
-  observacao String?
-
-  criadoEm DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
-
-  prescricao      Prescricao   @relation(fields: [prescricaoId], references: [id], onDelete: Restrict)
-  separadoPor     Colaborador? @relation("AdministracaoSeparador", fields: [separadoPorId], references: [id], onDelete: SetNull)
-  conferidoPor    Colaborador? @relation("AdministracaoConferente", fields: [conferidoPorId], references: [id], onDelete: SetNull)
-  administradoPor Colaborador? @relation("AdministracaoAdministrador", fields: [administradoPorId], references: [id], onDelete: SetNull)
-
-  @@map("administracao_medicamento")
 }
