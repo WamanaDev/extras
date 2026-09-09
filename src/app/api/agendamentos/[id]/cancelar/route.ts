@@ -7,7 +7,6 @@ import { obterPrisma } from '@/server/db/client';
 import { cancelarAgendamento, verificarPermissaoEdicao } from '@/server/services/pacientes/agendamentos';
 import { obterRtDoColaborador } from '@/server/services/pacientes/contexto';
 import { erroNaoEncontrado } from '@/server/http/erros';
-import { broadcastPacientes } from '@/server/realtime/broadcast-pacientes';
 
 const ParamsSchema = z.object({ id: z.string().uuid() });
 const BodySchema = z.object({ motivo: z.string().trim().min(1) }).strict();
@@ -23,10 +22,6 @@ export const POST = defineHandler({
     if (!atual) throw erroNaoEncontrado('Agendamento não encontrado.');
     verificarPermissaoEdicao(atual, { tipo: 'COLABORADOR', colaboradorId: ator.colaboradorId });
 
-    const agendamento = await cancelarAgendamento(prisma, params.id, body.motivo, { colaboradorId: ator.colaboradorId }, ctx);
-
-    await broadcastPacientes(rtId, 'agendamento:cancelado', { agendamentoId: params.id });
-
-    return agendamento;
+    return cancelarAgendamento(prisma, params.id, body.motivo, { colaboradorId: ator.colaboradorId }, ctx);
   },
 });

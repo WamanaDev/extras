@@ -8,7 +8,6 @@ import { defineHandler } from '@/server/http/handler';
 import { obterPrisma } from '@/server/db/client';
 import { conferirMedicamento } from '@/server/services/pacientes/medicamentos';
 import { obterRtDoColaborador } from '@/server/services/pacientes/contexto';
-import { broadcastPacientes } from '@/server/realtime/broadcast-pacientes';
 
 const ParamsSchema = z.object({ id: z.string().uuid() });
 const BodySchema = z.object({ confere: z.boolean(), observacao: z.string().trim().optional() }).strict();
@@ -20,10 +19,6 @@ export const POST = defineHandler({
   handler: async ({ params, body, ator, ctx }) => {
     const prisma = await obterPrisma();
     const rtId = await obterRtDoColaborador(prisma, ator.colaboradorId);
-    const resultado = await conferirMedicamento(prisma, params.id, rtId, ator.colaboradorId, body.confere, body.observacao, ctx);
-
-    await broadcastPacientes(rtId, body.confere ? 'medicacao:conferida' : 'medicacao:divergente', { administracaoId: params.id });
-
-    return resultado;
+    return conferirMedicamento(prisma, params.id, rtId, ator.colaboradorId, body.confere, body.observacao, ctx);
   },
 });

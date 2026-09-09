@@ -13,7 +13,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { post, patch, type ErroApi } from '@/lib/api/client';
-import { useAgendaPacientesRealtime } from '@/hooks/useAgendaPacientesRealtime';
 
 interface Agendamento {
   id: string;
@@ -90,8 +89,6 @@ export default function AgendaRtPage(): JSX.Element {
 
   const agenda = useRecursoApi<Agendamento[]>(`/api/agendamentos?de=${de}&ate=${ate}`);
   const pacientes = useRecursoApi<{ itens: PacienteItem[] }>('/api/pacientes');
-  const rtInfo = useRecursoApi<{ rtId: string }>('/api/colaborador/rt');
-  useAgendaPacientesRealtime(rtInfo.dados?.rtId, () => agenda.recarregar());
 
   const [novoAberto, setNovoAberto] = useState(false);
   const [form, setForm] = useState({ ...FORM_VAZIO, pacienteId: searchParams.get('pacienteId') ?? '' });

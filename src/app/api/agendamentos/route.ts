@@ -8,7 +8,6 @@ import { obterPrisma } from '@/server/db/client';
 import { agendaRt, criarAgendamento } from '@/server/services/pacientes/agendamentos';
 import { obterRtDoColaborador } from '@/server/services/pacientes/contexto';
 import { erroDeNegocio, erroNaoEncontrado } from '@/server/http/erros';
-import { broadcastPacientes } from '@/server/realtime/broadcast-pacientes';
 
 const ListarQuerySchema = z.object({
   de: z.string().date(),
@@ -59,11 +58,6 @@ export const POST = defineHandler({
     const alvo = await prisma.paciente.findFirst({ where: { id: body.pacienteId, rtId } });
     if (!alvo) throw erroNaoEncontrado('Paciente não encontrado.');
 
-    const agendamento = await criarAgendamento(prisma, body, { colaboradorId: ator.colaboradorId }, ctx);
-
-    // Depois do commit (RT-003, SEC-ACID) — nunca antes.
-    await broadcastPacientes(rtId, 'agendamento:criado', { agendamentoId: agendamento.id, pacienteId: agendamento.pacienteId, tipo: agendamento.tipo, inicioEm: agendamento.inicioEm });
-
-    return agendamento;
+    return criarAgendamento(prisma, body, { colaboradorId: ator.colaboradorId }, ctx);
   },
 });
