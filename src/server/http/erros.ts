@@ -114,7 +114,9 @@ export type CodigoErroNegocio =
   | 'CONFLITO_DE_HORARIO'
   | 'SEM_VAGA'
   /** `POST /api/admin/administradores` — convite pra e-mail já cadastrado no Supabase Auth. Aditivo, mesmo padrão acima. */
-  | 'EMAIL_JA_EXISTE';
+  | 'EMAIL_JA_EXISTE'
+  /** `DELETE /api/admin/administradores/:id` — admin não pode revogar a própria conta (evita autobloqueio). Aditivo, mesmo padrão acima. */
+  | 'NAO_PODE_REVOGAR_A_SI_MESMO';
 
 /** União completa de códigos que podem aparecer no campo `erro` da resposta (`CONVENTIONS.md`, "Envelope de resposta"). `SCREAMING_SNAKE`, sem acento. */
 export type CodigoErro = CodigoErroInfra | CodigoErroNegocio | ErroApi;

@@ -116,8 +116,21 @@ async function seedAdminInicial(): Promise<void> {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+  // Sem `redirectTo`, o Supabase cai no "Site URL" padrão do projeto — que
+  // pode não ser `/admin/definir-senha` (achado em uso real, mesmo bug do
+  // convite manual — ver `src/server/auth/administradores.ts`). Sem
+  // `NEXT_PUBLIC_APP_URL`, ainda convida (idempotente/best-effort), só avisa.
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (!appUrl) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[seed] NEXT_PUBLIC_APP_URL ausente — o convite vai usar o \"Site URL\" padrão do Supabase, que pode não ser /admin/definir-senha.",
+    );
+  }
+
   const { error } = await supabase.auth.admin.inviteUserByEmail(email, {
     data: { precisaDefinirSenha: true, origem: "seed_referencia" },
+    ...(appUrl ? { redirectTo: `${appUrl}/admin/definir-senha` } : {}),
   });
 
   if (error) {
