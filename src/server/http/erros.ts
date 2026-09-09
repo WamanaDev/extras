@@ -112,7 +112,9 @@ export type CodigoErroNegocio =
   // não é atribuível a `CodigoErro`). Nenhum código removido/redefinido.
   | 'COLABORADOR_BLOQUEADO'
   | 'CONFLITO_DE_HORARIO'
-  | 'SEM_VAGA';
+  | 'SEM_VAGA'
+  /** `POST /api/admin/administradores` — convite pra e-mail já cadastrado no Supabase Auth. Aditivo, mesmo padrão acima. */
+  | 'EMAIL_JA_EXISTE';
 
 /** União completa de códigos que podem aparecer no campo `erro` da resposta (`CONVENTIONS.md`, "Envelope de resposta"). `SCREAMING_SNAKE`, sem acento. */
 export type CodigoErro = CodigoErroInfra | CodigoErroNegocio | ErroApi;

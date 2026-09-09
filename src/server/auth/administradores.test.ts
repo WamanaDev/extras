@@ -1,0 +1,99 @@
+/**
+ * Testes de `listarAdministradores`/`convidarAdministrador` — Supabase Admin
+ * API fake (nenhuma chamada de rede real).
+ */
+import { describe, expect, it, vi } from 'vitest';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { listarAdministradores, convidarAdministrador, ehEmailJaExistente } from './administradores';
+
+function criarSupabaseFake(config: {
+  usuarios?: Array<Record<string, unknown>>;
+  erroListar?: string;
+  erroConvidar?: string;
+  convidadoId?: string;
+}): SupabaseClient {
+  return {
+    auth: {
+      admin: {
+        listUsers: vi.fn(async () =>
+          config.erroListar
+            ? { data: { users: [] }, error: { message: config.erroListar } }
+            : { data: { users: config.usuarios ?? [] }, error: null },
+        ),
+        inviteUserByEmail: vi.fn(async (email: string) =>
+          config.erroConvidar
+            ? { data: { user: null }, error: { message: config.erroConvidar } }
+            : { data: { user: { id: config.convidadoId ?? 'admin-novo', email } }, error: null },
+        ),
+      },
+    },
+  } as unknown as SupabaseClient;
+}
+
+describe('listarAdministradores', () => {
+  it('mapeia nome de user_metadata (nome ou full_name) e mfaAtivo a partir de factors', async () => {
+    const supabase = criarSupabaseFake({
+      usuarios: [
+        {
+          id: 'a1',
+          email: 'a1@exemplo.com',
+          created_at: '2026-01-01T00:00:00Z',
+          last_sign_in_at: '2026-02-01T00:00:00Z',
+          user_metadata: { nome: 'Fulana' },
+          factors: [{ id: 'f1' }],
+        },
+        {
+          id: 'a2',
+          email: 'a2@exemplo.com',
+          created_at: '2026-01-02T00:00:00Z',
+          last_sign_in_at: null,
+          user_metadata: { full_name: 'Beltrano' },
+          factors: [],
+        },
+        {
+          id: 'a3',
+          email: 'a3@exemplo.com',
+          created_at: '2026-01-03T00:00:00Z',
+          last_sign_in_at: null,
+          user_metadata: {},
+        },
+      ],
+    });
+
+    const resultado = await listarAdministradores(supabase);
+
+    expect(resultado).toEqual([
+      { id: 'a1', email: 'a1@exemplo.com', nome: 'Fulana', criadoEm: '2026-01-01T00:00:00Z', ultimoLoginEm: '2026-02-01T00:00:00Z', mfaAtivo: true },
+      { id: 'a2', email: 'a2@exemplo.com', nome: 'Beltrano', criadoEm: '2026-01-02T00:00:00Z', ultimoLoginEm: null, mfaAtivo: false },
+      { id: 'a3', email: 'a3@exemplo.com', nome: null, criadoEm: '2026-01-03T00:00:00Z', ultimoLoginEm: null, mfaAtivo: false },
+    ]);
+  });
+
+  it('erro do Supabase → lança', async () => {
+    const supabase = criarSupabaseFake({ erroListar: 'falha de rede' });
+    await expect(listarAdministradores(supabase)).rejects.toThrow('falha de rede');
+  });
+});
+
+describe('convidarAdministrador', () => {
+  it('convida com sucesso e devolve id/email', async () => {
+    const supabase = criarSupabaseFake({ convidadoId: 'admin-x' });
+    const resultado = await convidarAdministrador(supabase, { email: 'novo@exemplo.com', nome: 'Novo Admin' });
+    expect(resultado).toEqual({ id: 'admin-x', email: 'novo@exemplo.com' });
+  });
+
+  it('erro do Supabase → lança com a mensagem original', async () => {
+    const supabase = criarSupabaseFake({ erroConvidar: 'User already registered' });
+    await expect(convidarAdministrador(supabase, { email: 'ja@exemplo.com' })).rejects.toThrow('User already registered');
+  });
+});
+
+describe('ehEmailJaExistente', () => {
+  it.each(['User already registered', 'email exists', 'Email address already exists'])('reconhece "%s"', (mensagem) => {
+    expect(ehEmailJaExistente(mensagem)).toBe(true);
+  });
+
+  it('não reconhece mensagem de erro genérica', () => {
+    expect(ehEmailJaExistente('falha de rede')).toBe(false);
+  });
+});
