@@ -84,7 +84,14 @@ export type AcaoAuditoria =
    */
   | 'CANCELAMENTO_SOLICITADO'
   | 'CANCELAMENTO_APROVADO'
-  | 'CANCELAMENTO_RECUSADO';
+  | 'CANCELAMENTO_RECUSADO'
+  /**
+   * Admin convida um novo administrador (`POST /api/admin/administradores`)
+   * — pedido do usuário, sem spec de API própria ainda. Extensão aditiva,
+   * mesmo padrão de `NOTIFICACAO_ENVIADA`/`CODIGO_ESCALA_*` acima. Ver
+   * `_conflitos.md`.
+   */
+  | 'ADMIN_CONVIDADO';
 
 export interface EventoAuditoria {
   atorTipo: AtorTipo;

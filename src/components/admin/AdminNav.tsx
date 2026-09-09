@@ -16,6 +16,7 @@ const ITENS_NAV = [
   { href: '/admin/relatorios', rotulo: 'Relatórios' },
   { href: '/admin/auditoria', rotulo: 'Auditoria' },
   { href: '/admin/seguranca', rotulo: 'Segurança' },
+  { href: '/admin/administradores', rotulo: 'Administradores' },
   { href: '/admin/configuracoes', rotulo: 'Configurações' },
 ] as const;
 

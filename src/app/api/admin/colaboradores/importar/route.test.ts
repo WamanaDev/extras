@@ -89,11 +89,11 @@ function reqComArquivo(conteudo: string, opcoes: { preview?: boolean; nomeCampo?
 /** Rota sem segmento dinâmico — `params` ainda é exigido pelo tipo `RotaHandler` (ver `handler.ts`). */
 const CTX = { params: Promise.resolve({}) };
 
-let criarHandlerImportar: typeof import('./route').criarHandlerImportar;
+let criarHandlerImportar: typeof import('./_impl').criarHandlerImportar;
 let registrarAuditoria: ReturnType<typeof vi.fn>;
 
 beforeAll(async () => {
-  const modulo = await import('./route');
+  const modulo = await import('./_impl');
   criarHandlerImportar = modulo.criarHandlerImportar;
   const auditoria = await import('@/server/audit/registrar');
   registrarAuditoria = vi.mocked(auditoria.registrarAuditoria);
