@@ -1,0 +1,82 @@
+<!--
+  Template "Reauthentication" do Supabase Auth — identidade Extrinha.
+  Onde colar: Supabase Dashboard → Authentication → Email Templates →
+  "Reauthentication". Variável: {{ .Token }} (código de 6 dígitos — este
+  template NÃO tem link, é um código pra digitar de volta no app; por isso
+  o layout troca o botão por um bloco de código).
+
+  Diferente do MFA por app autenticador que o admin já cadastra em
+  /admin/configurar-mfa — este é o código de reautenticação por e-mail que o
+  Supabase Auth pede antes de uma operação sensível (ex. trocar senha/e-mail
+  numa sessão já autenticada). Incluído por completude.
+-->
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Seu código de confirmação — Extrinha</title>
+  </head>
+  <body style="margin:0; padding:0; background-color:#F4F6F5; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F4F6F5; padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="width:480px; max-width:100%; background-color:#FFFFFF; border-radius:16px; overflow:hidden; border:1px solid #E7F1F0;">
+
+            <tr>
+              <td style="padding:32px 32px 8px 32px;">
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="width:40px; height:40px; border-radius:9px; background-color:#FF6B4D;" align="center" valign="middle">
+                      <span style="display:inline-block; color:#FFF8F3; font-size:22px; font-weight:700; line-height:40px;">+</span>
+                    </td>
+                    <td style="padding-left:10px;">
+                      <span style="font-size:19px; font-weight:700; color:#083935; letter-spacing:-0.02em;">extrinha</span>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:16px 32px 8px 32px;">
+                <h1 style="margin:0 0 12px 0; font-size:21px; line-height:28px; color:#083935; font-weight:700;">
+                  Seu código de confirmação
+                </h1>
+                <p style="margin:0 0 20px 0; font-size:15px; line-height:23px; color:#3F4A49;">
+                  Use o código abaixo para confirmar essa ação na sua conta do Extrinha. Ele expira em poucos
+                  minutos por segurança.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:0 32px 24px 32px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F4F6F5; border-radius:10px;">
+                  <tr>
+                    <td align="center" style="padding:20px;">
+                      <span style="font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace; font-size:32px; font-weight:700; letter-spacing:0.3em; color:#083935;">
+                        {{ .Token }}
+                      </span>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:0 32px 28px 32px;">
+                <p style="margin:0; font-size:13px; line-height:20px; color:#8A9492;">
+                  Se você não pediu esse código, pode ignorar este e-mail com segurança — sem ele, ninguém consegue
+                  concluir a ação.
+                </p>
+              </td>
+            </tr>
+          </table>
+
+          <p style="margin:20px 0 0 0; font-size:12px; color:#A2ACAA;">Extrinha</p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

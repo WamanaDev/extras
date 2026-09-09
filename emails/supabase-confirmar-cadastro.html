@@ -1,0 +1,103 @@
+<!--
+  Template "Confirm signup" do Supabase Auth — identidade Extrinha.
+  Onde colar: Supabase Dashboard → Authentication → Email Templates →
+  "Confirm signup". Variável: {{ .ConfirmationURL }}.
+
+  Hoje o app não tem auto-cadastro de admin (só convite — ver
+  supabase-convite-admin.html) nem de colaborador (matrícula+PIN, fora do
+  Supabase Auth), então este template não deve disparar na prática agora —
+  incluído mesmo assim porque o Supabase sempre reserva esse slot, e é
+  melhor ter a marca certa nele do que o template genérico em inglês caso
+  algum fluxo futuro (ex. auto-cadastro) volte a usá-lo.
+-->
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Confirme seu cadastro — Extrinha</title>
+  </head>
+  <body style="margin:0; padding:0; background-color:#F4F6F5; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F4F6F5; padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="width:480px; max-width:100%; background-color:#FFFFFF; border-radius:16px; overflow:hidden; border:1px solid #E7F1F0;">
+
+            <tr>
+              <td style="padding:32px 32px 8px 32px;">
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="width:40px; height:40px; border-radius:9px; background-color:#FF6B4D;" align="center" valign="middle">
+                      <span style="display:inline-block; color:#FFF8F3; font-size:22px; font-weight:700; line-height:40px;">+</span>
+                    </td>
+                    <td style="padding-left:10px;">
+                      <span style="font-size:19px; font-weight:700; color:#083935; letter-spacing:-0.02em;">extrinha</span>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:16px 32px 8px 32px;">
+                <h1 style="margin:0 0 12px 0; font-size:21px; line-height:28px; color:#083935; font-weight:700;">
+                  Confirme seu cadastro
+                </h1>
+                <p style="margin:0 0 20px 0; font-size:15px; line-height:23px; color:#3F4A49;">
+                  Recebemos um pedido de cadastro para <strong>{{ .Email }}</strong> no Extrinha. Clique no botão
+                  abaixo para confirmar seu e-mail e ativar sua conta.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:8px 32px 24px 32px;">
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="border-radius:10px; background-color:#FF6B4D;">
+                      <a
+                        href="{{ .ConfirmationURL }}"
+                        target="_blank"
+                        style="display:inline-block; padding:13px 28px; font-size:15px; font-weight:600; color:#FFFFFF; text-decoration:none; border-radius:10px;"
+                      >
+                        Confirmar e-mail
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:0 32px 28px 32px;">
+                <p style="margin:0; font-size:13px; line-height:20px; color:#8A9492;">
+                  Se você não pediu este cadastro, pode ignorar este e-mail com segurança — nenhuma conta será
+                  ativada.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:0 32px;">
+                <div style="border-top:1px solid #E7F1F0;"></div>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:20px 32px 28px 32px;">
+                <p style="margin:0 0 6px 0; font-size:12px; line-height:18px; color:#8A9492;">
+                  Se o botão não funcionar, copie e cole este link no navegador:
+                </p>
+                <p style="margin:0; font-size:12px; line-height:18px; word-break:break-all;">
+                  <a href="{{ .ConfirmationURL }}" style="color:#0B4F4A;">{{ .ConfirmationURL }}</a>
+                </p>
+              </td>
+            </tr>
+          </table>
+
+          <p style="margin:20px 0 0 0; font-size:12px; color:#A2ACAA;">Extrinha</p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

@@ -1,0 +1,110 @@
+<!--
+  Template de e-mail "Invite user" do Supabase Auth, com a identidade do
+  Extrinha (mesmas cores/marca de src/components/brand/Logo.tsx e
+  tailwind.config.ts: coral #FF6B4D/#E8532F, petróleo #0B4F4A/#083935).
+
+  Onde colar: Supabase Dashboard → Authentication → Email Templates →
+  "Invite user". Cole o HTML abaixo inteiro no campo de corpo do e-mail.
+  {{ .ConfirmationURL }} é a variável padrão do Supabase para esse template
+  — não trocar o nome.
+
+  Tabelas + estilo inline de propósito (não CSS externo, não flexbox/grid):
+  é o que sobrevive a clientes de e-mail (Outlook/Gmail) sem quebrar layout.
+-->
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Convite — Extrinha</title>
+  </head>
+  <body style="margin:0; padding:0; background-color:#F4F6F5; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F4F6F5; padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="width:480px; max-width:100%; background-color:#FFFFFF; border-radius:16px; overflow:hidden; border:1px solid #E7F1F0;">
+
+            <!-- Cabeçalho: marca -->
+            <tr>
+              <td style="padding:32px 32px 8px 32px;">
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="width:40px; height:40px; border-radius:9px; background-color:#FF6B4D;" align="center" valign="middle">
+                      <span style="display:inline-block; color:#FFF8F3; font-size:22px; font-weight:700; line-height:40px;">+</span>
+                    </td>
+                    <td style="padding-left:10px;">
+                      <span style="font-size:19px; font-weight:700; color:#083935; letter-spacing:-0.02em;">extrinha</span>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- Corpo -->
+            <tr>
+              <td style="padding:16px 32px 8px 32px;">
+                <h1 style="margin:0 0 12px 0; font-size:21px; line-height:28px; color:#083935; font-weight:700;">
+                  Você foi convidado para administrar o Extrinha
+                </h1>
+                <p style="margin:0 0 20px 0; font-size:15px; line-height:23px; color:#3F4A49;">
+                  Um administrador convidou <strong>{{ .Email }}</strong> para acessar o painel administrativo do
+                  Extrinha. Clique no botão abaixo para definir sua senha e ativar sua conta.
+                </p>
+              </td>
+            </tr>
+
+            <!-- Botão -->
+            <tr>
+              <td style="padding:8px 32px 24px 32px;">
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="border-radius:10px; background-color:#FF6B4D;">
+                      <a
+                        href="{{ .ConfirmationURL }}"
+                        target="_blank"
+                        style="display:inline-block; padding:13px 28px; font-size:15px; font-weight:600; color:#FFFFFF; text-decoration:none; border-radius:10px;"
+                      >
+                        Aceitar convite
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- Aviso -->
+            <tr>
+              <td style="padding:0 32px 28px 32px;">
+                <p style="margin:0; font-size:13px; line-height:20px; color:#8A9492;">
+                  Este link expira em algumas horas por segurança. Se você não esperava este convite, pode ignorar
+                  este e-mail com segurança — nenhuma conta será criada.
+                </p>
+              </td>
+            </tr>
+
+            <!-- Divisor -->
+            <tr>
+              <td style="padding:0 32px;">
+                <div style="border-top:1px solid #E7F1F0;"></div>
+              </td>
+            </tr>
+
+            <!-- Rodapé -->
+            <tr>
+              <td style="padding:20px 32px 28px 32px;">
+                <p style="margin:0 0 6px 0; font-size:12px; line-height:18px; color:#8A9492;">
+                  Se o botão não funcionar, copie e cole este link no navegador:
+                </p>
+                <p style="margin:0; font-size:12px; line-height:18px; word-break:break-all;">
+                  <a href="{{ .ConfirmationURL }}" style="color:#0B4F4A;">{{ .ConfirmationURL }}</a>
+                </p>
+              </td>
+            </tr>
+          </table>
+
+          <p style="margin:20px 0 0 0; font-size:12px; color:#A2ACAA;">Extrinha</p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
