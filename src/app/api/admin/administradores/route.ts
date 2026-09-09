@@ -39,11 +39,17 @@ export const POST = defineHandler({
   body: ConvidarSchema,
   cache: 'mutacao',
   statusSucesso: 201,
-  handler: async ({ body, ator, ctx }) => {
+  handler: async ({ body, ator, ctx, request }) => {
+    // Sem isso, o Supabase manda pro "Site URL" padrão do projeto (achado
+    // em uso real — caía em `/login`, tela de colaborador). Ver docstring
+    // de `EntradaConvidarAdministrador.redirectTo`.
+    const redirectTo = `${new URL(request.url).origin}/admin/definir-senha`;
+
     let convidado: { id: string; email: string | null };
     try {
       convidado = await convidarAdministrador(obterSupabaseAdmin(), {
         email: body.email,
+        redirectTo,
         ...(body.nome !== undefined ? { nome: body.nome } : {}),
       });
     } catch (erro) {

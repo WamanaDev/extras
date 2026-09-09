@@ -91,7 +91,13 @@ export type AcaoAuditoria =
    * mesmo padrão de `NOTIFICACAO_ENVIADA`/`CODIGO_ESCALA_*` acima. Ver
    * `_conflitos.md`.
    */
-  | 'ADMIN_CONVIDADO';
+  | 'ADMIN_CONVIDADO'
+  /**
+   * Admin revoga outro administrador — conta ativa ou convite pendente
+   * ainda não aceito (`DELETE /api/admin/administradores/:id`), pedido do
+   * usuário. Extensão aditiva, mesmo padrão de `ADMIN_CONVIDADO` acima.
+   */
+  | 'ADMIN_REVOGADO';
 
 export interface EventoAuditoria {
   atorTipo: AtorTipo;

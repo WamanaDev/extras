@@ -1,21 +1,28 @@
 'use client';
 
 /**
- * `/admin/administradores` — convidar e listar administradores. Fecha a
- * lacuna documentada em `/admin/configuracoes` (pedido do usuário).
+ * `/admin/administradores` — convidar, listar e revogar administradores.
+ * Fecha a lacuna documentada em `/admin/configuracoes` (pedido do usuário).
  *
  * "Admin" aqui é qualquer conta do Supabase Auth deste projeto — não existe
  * papel/role separado (`src/server/auth/administradores.ts`). Convite manda
  * e-mail com link pra `/admin/definir-senha`; se o e-mail não chegar (dev
  * local, allowlist de redirect), o convidado pode usar `/admin/primeiro-acesso`
  * com a senha temporária, mesmo fallback que o admin inicial usa.
+ *
+ * Revogar (pedido do usuário) é a mesma ação pra conta já ativa ou convite
+ * ainda não aceito (`pendente`) — o Supabase não distingue as duas coisas,
+ * ver docstring de `revogarAdministrador`. Nunca mostra o botão na própria
+ * linha (busca a própria identidade via `GET /api/auth/me`) — a API também
+ * recusa (`NAO_PODE_REVOGAR_A_SI_MESMO`), isso aqui só evita a tentativa.
  */
 import { useState } from 'react';
 import { useRecursoApi } from '@/lib/api/use-recurso';
 import { EstadoCarregando, EstadoErro, EstadoVazio } from '@/components/admin/Estado';
+import { ConfirmacaoImpacto } from '@/components/comum/ConfirmacaoImpacto';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { post, type ErroApi } from '@/lib/api/client';
+import { post, del, type ErroApi } from '@/lib/api/client';
 
 interface AdministradorListado {
   id: string;
@@ -24,6 +31,12 @@ interface AdministradorListado {
   criadoEm: string;
   ultimoLoginEm: string | null;
   mfaAtivo: boolean;
+  pendente: boolean;
+}
+
+interface RespostaMe {
+  tipo: 'ADMIN' | 'COLABORADOR';
+  admin?: { id: string };
 }
 
 function formatarData(iso: string | null): string {
@@ -33,12 +46,18 @@ function formatarData(iso: string | null): string {
 
 export default function AdministradoresPage(): JSX.Element {
   const administradores = useRecursoApi<{ itens: AdministradorListado[] }>('/api/admin/administradores');
+  const me = useRecursoApi<RespostaMe>('/api/auth/me');
+  const meuId = me.dados?.admin?.id;
 
   const [email, setEmail] = useState('');
   const [nome, setNome] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<ErroApi | null>(null);
   const [sucesso, setSucesso] = useState<string | null>(null);
+
+  const [paraRevogar, setParaRevogar] = useState<AdministradorListado | null>(null);
+  const [revogando, setRevogando] = useState(false);
+  const [erroRevogar, setErroRevogar] = useState<string | null>(null);
 
   async function convidar(): Promise<void> {
     setEnviando(true);
@@ -60,6 +79,20 @@ export default function AdministradoresPage(): JSX.Element {
     setSucesso(`Convite enviado para ${resultado.dados.administrador.email}.`);
     setEmail('');
     setNome('');
+    administradores.recarregar();
+  }
+
+  async function confirmarRevogar(): Promise<void> {
+    if (!paraRevogar) return;
+    setRevogando(true);
+    setErroRevogar(null);
+    const resultado = await del(`/api/admin/administradores/${paraRevogar.id}`);
+    setRevogando(false);
+    if (!resultado.ok) {
+      setErroRevogar(resultado.erro.mensagem);
+      return;
+    }
+    setParaRevogar(null);
     administradores.recarregar();
   }
 
@@ -126,9 +159,11 @@ export default function AdministradoresPage(): JSX.Element {
                 <tr className="border-b border-slate-200 text-left text-slate-500">
                   <th className="p-2">Nome</th>
                   <th className="p-2">E-mail</th>
+                  <th className="p-2">Status</th>
                   <th className="p-2">Convidado em</th>
                   <th className="p-2">Último acesso</th>
                   <th className="p-2">MFA</th>
+                  <th className="p-2" />
                 </tr>
               </thead>
               <tbody>
@@ -136,10 +171,33 @@ export default function AdministradoresPage(): JSX.Element {
                   <tr key={a.id} className="border-b border-slate-100">
                     <td className="p-2 font-medium text-slate-900">{a.nome ?? '—'}</td>
                     <td className="p-2">{a.email ?? '—'}</td>
+                    <td className="p-2">
+                      {a.pendente ? (
+                        <Badge variant="secondary">Convite pendente</Badge>
+                      ) : (
+                        <Badge variant="default">Ativo</Badge>
+                      )}
+                    </td>
                     <td className="p-2">{formatarData(a.criadoEm)}</td>
                     <td className="p-2">{formatarData(a.ultimoLoginEm)}</td>
                     <td className="p-2">
-                      {a.mfaAtivo ? <Badge variant="default">Ativo</Badge> : <Badge variant="secondary">Pendente</Badge>}
+                      {a.mfaAtivo ? <Badge variant="default">Ativo</Badge> : <Badge variant="secondary">Não configurado</Badge>}
+                    </td>
+                    <td className="p-2 text-right">
+                      {a.id !== meuId ? (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => {
+                            setErroRevogar(null);
+                            setParaRevogar(a);
+                          }}
+                        >
+                          {a.pendente ? 'Cancelar convite' : 'Revogar acesso'}
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-slate-400">Você</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -148,6 +206,28 @@ export default function AdministradoresPage(): JSX.Element {
           </div>
         )}
       </section>
+
+      <ConfirmacaoImpacto
+        aberto={paraRevogar !== null}
+        titulo={paraRevogar?.pendente ? 'Cancelar convite' : 'Revogar acesso de administrador'}
+        mensagem={
+          paraRevogar?.pendente
+            ? 'Esta pessoa não vai mais conseguir aceitar o convite. Você pode convidar de novo depois, se precisar.'
+            : 'Esta pessoa perde o acesso ao painel administrativo imediatamente. Você pode convidá-la de novo depois, se precisar.'
+        }
+        itens={paraRevogar ? [paraRevogar.email ?? paraRevogar.nome ?? paraRevogar.id] : []}
+        carregando={revogando}
+        onConfirmar={() => void confirmarRevogar()}
+        onCancelar={() => {
+          setParaRevogar(null);
+          setErroRevogar(null);
+        }}
+      />
+      {erroRevogar ? (
+        <p role="alert" className="text-sm text-red-800">
+          {erroRevogar}
+        </p>
+      ) : null}
     </div>
   );
 }
