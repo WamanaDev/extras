@@ -1,8 +1,5 @@
 /**
- * API-MED-006 — `GET /api/pacientes/:id/administracoes`. Parâmetro `id`
- * (não `pacienteId`) — Next.js exige o mesmo nome de slug em toda rota
- * dinâmica irmã sob `api/pacientes/*` (`[id]` já usado por
- * `GET /api/pacientes/:id`).
+ * API-MED-006 — `GET /api/pacientes/:pacienteId/administracoes`.
  */
 import { z } from 'zod';
 import { defineHandler } from '@/server/http/handler';
@@ -10,7 +7,7 @@ import { obterPrisma } from '@/server/db/client';
 import { listarAdministracoes } from '@/server/services/pacientes/medicamentos';
 import { obterRtDoColaborador } from '@/server/services/pacientes/contexto';
 
-const ParamsSchema = z.object({ id: z.string().uuid() });
+const ParamsSchema = z.object({ pacienteId: z.string().uuid() });
 
 function hojeISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -31,6 +28,6 @@ export const GET = defineHandler({
     const prisma = await obterPrisma();
     const rtId = await obterRtDoColaborador(prisma, ator.colaboradorId);
     const hoje = hojeISO();
-    return listarAdministracoes(prisma, params.id, rtId, query.de ?? hoje, query.ate ?? hoje);
+    return listarAdministracoes(prisma, params.pacienteId, rtId, query.de ?? hoje, query.ate ?? hoje);
   },
 });
