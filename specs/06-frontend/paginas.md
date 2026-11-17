@@ -11,10 +11,11 @@
 /login/cpf                      → matrícula (primeiro acesso / esqueci o PIN) API-AUTH-001, com link para /login
 /login/pin                      → PIN                                 API-AUTH-002
 /login/definir-pin              → primeiro acesso                      API-AUTH-003
-/admin/login                    → e-mail + senha + MFA                API-AUTH-006
+/admin/login                    → e-mail + senha + código no WhatsApp API-AUTH-006
 /admin/recuperar-senha          → "esqueci minha senha" (admin)        (sem API-ADM-* — Supabase Auth)
 /admin/definir-senha            → aceitar convite / trocar senha       (sem API-ADM-* — Supabase Auth)
-/admin/configurar-mfa           → cadastro de TOTP no primeiro acesso  (sem API-ADM-* — Supabase Auth)
+/admin/verificar                → código no WhatsApp (sessão de senha) API-AUTH-006 (codigo/enviar, codigo/verificar)
+/admin/configurar-mfa           → só redireciona pra /admin/verificar (TOTP aposentado)
 
 /(colaborador)
   /painel                       → saldo, próximos plantões             API-COL-001/007
@@ -64,8 +65,8 @@ funcionando exatamente como deveria.
 **Primeiro acesso e recuperação de senha do admin.** `prisma/seed.ts` convida o admin
 inicial via `supabase.auth.admin.inviteUserByEmail`; `/admin/definir-senha` recebe a sessão
 que o SDK do Supabase estabelece a partir do link de convite/magic link (hash da URL) e
-chama `auth.updateUser` para a nova senha. `/admin/configurar-mfa` cadastra o fator TOTP
-exigido por `API-AUTH-006` (`auth.mfa.enroll`/`challengeAndVerify`). `/admin/recuperar-senha`
+chama `auth.updateUser` para a nova senha, depois segue para `/admin/verificar`, que manda o
+código pro WhatsApp cadastrado por quem convidou (`API-AUTH-006`). `/admin/recuperar-senha`
 usa `resetPasswordForEmail` e redireciona para `/admin/definir-senha` (reaproveitada, não
 duplicada); resposta sempre neutra quanto a existência do e-mail (`contrato-comum.md`).
 Nenhuma das três rotas fica atrás de `(protected)/layout.tsx` — são pré-requisito para

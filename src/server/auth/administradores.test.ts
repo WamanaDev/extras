@@ -4,7 +4,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { listarAdministradores, convidarAdministrador, revogarAdministrador, ehEmailJaExistente } from './administradores';
+import { listarAdministradores, convidarAdministrador, revogarAdministrador, ehEmailJaExistente, definirWhatsappAdministrador } from './administradores';
 
 function criarSupabaseFake(config: {
   usuarios?: Array<Record<string, unknown>>;
@@ -12,7 +12,8 @@ function criarSupabaseFake(config: {
   erroConvidar?: string;
   convidadoId?: string;
   erroRevogar?: string;
-}): SupabaseClient & { auth: { admin: { deleteUser: ReturnType<typeof vi.fn>; inviteUserByEmail: ReturnType<typeof vi.fn> } } } {
+  erroAtualizar?: string;
+}): SupabaseClient & { auth: { admin: { deleteUser: ReturnType<typeof vi.fn>; inviteUserByEmail: ReturnType<typeof vi.fn>; updateUserById: ReturnType<typeof vi.fn> } } } {
   return {
     auth: {
       admin: {
@@ -26,14 +27,15 @@ function criarSupabaseFake(config: {
             ? { data: { user: null }, error: { message: config.erroConvidar } }
             : { data: { user: { id: config.convidadoId ?? 'admin-novo', email } }, error: null },
         ),
+        updateUserById: vi.fn(async () => (config.erroAtualizar ? { data: { user: null }, error: { message: config.erroAtualizar } } : { data: { user: {} }, error: null })),
         deleteUser: vi.fn(async () => (config.erroRevogar ? { data: null, error: { message: config.erroRevogar } } : { data: {}, error: null })),
       },
     },
-  } as unknown as SupabaseClient & { auth: { admin: { deleteUser: ReturnType<typeof vi.fn>; inviteUserByEmail: ReturnType<typeof vi.fn> } } };
+  } as unknown as SupabaseClient & { auth: { admin: { deleteUser: ReturnType<typeof vi.fn>; inviteUserByEmail: ReturnType<typeof vi.fn>; updateUserById: ReturnType<typeof vi.fn> } } };
 }
 
 describe('listarAdministradores', () => {
-  it('mapeia nome de user_metadata (nome ou full_name), mfaAtivo a partir de factors, e pendente de last_sign_in_at', async () => {
+  it('mapeia nome de user_metadata (nome ou full_name), whatsapp de app_metadata, e pendente de last_sign_in_at', async () => {
     const supabase = criarSupabaseFake({
       usuarios: [
         {
@@ -42,7 +44,7 @@ describe('listarAdministradores', () => {
           created_at: '2026-01-01T00:00:00Z',
           last_sign_in_at: '2026-02-01T00:00:00Z',
           user_metadata: { nome: 'Fulana' },
-          factors: [{ id: 'f1' }],
+          app_metadata: { provider: 'email', whatsapp: '5511987654321' },
         },
         {
           id: 'a2',
@@ -50,7 +52,7 @@ describe('listarAdministradores', () => {
           created_at: '2026-01-02T00:00:00Z',
           last_sign_in_at: null,
           user_metadata: { full_name: 'Beltrano' },
-          factors: [],
+          app_metadata: { provider: 'email' },
         },
         {
           id: 'a3',
@@ -65,9 +67,9 @@ describe('listarAdministradores', () => {
     const resultado = await listarAdministradores(supabase);
 
     expect(resultado).toEqual([
-      { id: 'a1', email: 'a1@exemplo.com', nome: 'Fulana', criadoEm: '2026-01-01T00:00:00Z', ultimoLoginEm: '2026-02-01T00:00:00Z', mfaAtivo: true, pendente: false },
-      { id: 'a2', email: 'a2@exemplo.com', nome: 'Beltrano', criadoEm: '2026-01-02T00:00:00Z', ultimoLoginEm: null, mfaAtivo: false, pendente: true },
-      { id: 'a3', email: 'a3@exemplo.com', nome: null, criadoEm: '2026-01-03T00:00:00Z', ultimoLoginEm: null, mfaAtivo: false, pendente: true },
+      { id: 'a1', email: 'a1@exemplo.com', nome: 'Fulana', criadoEm: '2026-01-01T00:00:00Z', ultimoLoginEm: '2026-02-01T00:00:00Z', whatsapp: '5511987654321', pendente: false },
+      { id: 'a2', email: 'a2@exemplo.com', nome: 'Beltrano', criadoEm: '2026-01-02T00:00:00Z', ultimoLoginEm: null, whatsapp: null, pendente: true },
+      { id: 'a3', email: 'a3@exemplo.com', nome: null, criadoEm: '2026-01-03T00:00:00Z', ultimoLoginEm: null, whatsapp: null, pendente: true },
     ]);
   });
 
@@ -83,6 +85,7 @@ describe('convidarAdministrador', () => {
     const resultado = await convidarAdministrador(supabase, {
       email: 'novo@exemplo.com',
       nome: 'Novo Admin',
+      whatsapp: '5511987654321',
       redirectTo: 'https://app.exemplo.com/admin/definir-senha',
     });
     expect(resultado).toEqual({ id: 'admin-x', email: 'novo@exemplo.com' });
@@ -90,13 +93,27 @@ describe('convidarAdministrador', () => {
       'novo@exemplo.com',
       expect.objectContaining({ redirectTo: 'https://app.exemplo.com/admin/definir-senha' }),
     );
+    expect(supabase.auth.admin.updateUserById).toHaveBeenCalledWith('admin-x', { app_metadata: { whatsapp: '5511987654321' } });
   });
 
   it('erro do Supabase → lança com a mensagem original', async () => {
     const supabase = criarSupabaseFake({ erroConvidar: 'User already registered' });
     await expect(
-      convidarAdministrador(supabase, { email: 'ja@exemplo.com', redirectTo: 'https://app.exemplo.com/admin/definir-senha' }),
+      convidarAdministrador(supabase, { email: 'ja@exemplo.com', whatsapp: '5511987654321', redirectTo: 'https://app.exemplo.com/admin/definir-senha' }),
     ).rejects.toThrow('User already registered');
+  });
+});
+
+describe('definirWhatsappAdministrador', () => {
+  it('grava em app_metadata (nunca user_metadata, que o próprio usuário edita)', async () => {
+    const supabase = criarSupabaseFake({});
+    await definirWhatsappAdministrador(supabase, 'admin-x', '5511987654321');
+    expect(supabase.auth.admin.updateUserById).toHaveBeenCalledWith('admin-x', { app_metadata: { whatsapp: '5511987654321' } });
+  });
+
+  it('erro do Supabase → lança', async () => {
+    const supabase = criarSupabaseFake({ erroAtualizar: 'User not found' });
+    await expect(definirWhatsappAdministrador(supabase, 'x', '5511987654321')).rejects.toThrow('User not found');
   });
 });
 

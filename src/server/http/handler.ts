@@ -145,28 +145,18 @@ function obterPrismaSingleton(PrismaClientCtor: new () => any): any {
 }
 
 /**
- * Sessão de admin via Supabase Auth (`stack.md`, "Auth admin: Supabase Auth
- * + MFA"). Lê o cookie de sessão gerenciado por `@supabase/ssr` — o adapter
- * de cookies aqui é só leitura (rota de API não decide refresh de token de
- * admin; isso é `04-api/auth/API-AUTH-006-admin-login.md`).
+ * Sessão de admin: Supabase Auth (senha) **e** segundo fator por WhatsApp
+ * (cookie `admin_2fa`) — ver `src/server/auth/sessao-admin.ts`. Sessão do
+ * Supabase sem o segundo fator verificado não é admin: antes desta regra,
+ * a rota de login gravava a sessão logo após a senha e qualquer rota
+ * `ADMIN` já a aceitava, pulando o segundo fator por completo.
  */
 async function resolverSessaoAdmin(request: NextRequest): Promise<AtorAdmin | null> {
-  const { createServerClient } = await import('@supabase/ssr');
-  const { env } = await import('@/env');
-
-  const supabase = createServerClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
-    cookies: {
-      getAll: () => request.cookies.getAll().map((c) => ({ name: c.name, value: c.value })),
-      // Rota de leitura de sessão não escreve cookie de volta — refresh é responsabilidade de quem faz login.
-      setAll: () => {},
-    },
-  });
-
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) return null;
-  const metadata = data.user.user_metadata as Record<string, unknown> | undefined;
-  const nome = typeof metadata?.nome === 'string' ? metadata.nome : typeof metadata?.full_name === 'string' ? (metadata.full_name as string) : null;
-  return { tipo: 'ADMIN', adminId: data.user.id, email: data.user.email ?? null, nome };
+  const { lerSessaoAdmin } = await import('@/server/auth/sessao-admin');
+  const resultado = await lerSessaoAdmin(request.cookies.getAll().map((c) => ({ name: c.name, value: c.value })));
+  if (resultado.estado !== 'VERIFICADA') return null;
+  const { id, email, nome } = resultado.usuario;
+  return { tipo: 'ADMIN', adminId: id, email, nome };
 }
 
 /**

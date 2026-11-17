@@ -64,7 +64,8 @@ export default function PoliticaPrivacidadePage(): JSX.Element {
         <p className="font-medium text-slate-900">De administradores:</p>
         <ul className="list-disc space-y-1 pl-5">
           <li>Nome e e-mail</li>
-          <li>Senha (gerenciada pelo provedor de autenticação, nunca visível a nós) e fator de autenticação MFA</li>
+          <li>Senha (gerenciada pelo provedor de autenticação, nunca visível a nós) </li>
+          <li>Número de WhatsApp, usado só para enviar o código de acesso ao painel</li>
         </ul>
 
         <p className="font-medium text-slate-900">De todo mundo, automaticamente:</p>

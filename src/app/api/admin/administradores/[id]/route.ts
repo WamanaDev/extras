@@ -1,4 +1,9 @@
 /**
+ * `PATCH /api/admin/administradores/:id` — cadastra/troca o WhatsApp do
+ * segundo fator de login (`app_metadata.whatsapp`). Pode ser o do próprio
+ * admin (já está com sessão completa, então já provou posse do número
+ * atual). Audita `ADMIN_WHATSAPP_ALTERADO`.
+ *
  * `DELETE /api/admin/administradores/:id` — revoga um administrador (conta
  * ativa ou convite pendente ainda não aceito — mesma operação, ver
  * docstring de `revogarAdministrador`).
@@ -12,12 +17,13 @@
  */
 import { z } from 'zod';
 import { defineHandler } from '@/server/http/handler';
-import { erroDeNegocio, erroNaoEncontrado } from '@/server/http/erros';
+import { erroDeNegocio, erroDeValidacao, erroNaoEncontrado } from '@/server/http/erros';
 import { emTransacao } from '@/server/db/tx';
 import { registrarAuditoria } from '@/server/audit/registrar';
 import { obterPrisma } from '@/server/db/client';
 import { obterSupabaseAdmin } from '@/server/auth/supabase-admin';
-import { revogarAdministrador } from '@/server/auth/administradores';
+import { revogarAdministrador, definirWhatsappAdministrador } from '@/server/auth/administradores';
+import { normalizarWhatsapp, mascararWhatsapp } from '@/server/auth/segundo-fator';
 
 const ParamsSchema = z.object({ id: z.string().uuid() });
 
@@ -57,5 +63,45 @@ export const DELETE = defineHandler({
     );
 
     return { id: params.id };
+  },
+});
+
+const WhatsappSchema = z.object({ whatsapp: z.string() });
+
+export const PATCH = defineHandler({
+  ator: 'ADMIN',
+  rateLimit: { escopo: 'global_por_ip' },
+  params: ParamsSchema,
+  body: WhatsappSchema,
+  cache: 'mutacao',
+  handler: async ({ params, body, ator, ctx }) => {
+    const whatsapp = normalizarWhatsapp(body.whatsapp);
+    if (!whatsapp) throw erroDeValidacao({ whatsapp: 'WhatsApp inválido. Use DDD + número, ex.: (11) 98765-4321.' });
+
+    try {
+      await definirWhatsappAdministrador(obterSupabaseAdmin(), params.id, whatsapp);
+    } catch (erro) {
+      const mensagem = erro instanceof Error ? erro.message : '';
+      if (/not.?found/i.test(mensagem)) throw erroNaoEncontrado('Administrador não encontrado.');
+      throw erro;
+    }
+
+    const prisma = await obterPrisma();
+    await emTransacao(prisma, (tx) =>
+      registrarAuditoria(tx, {
+        atorTipo: 'ADMIN',
+        atorId: ator.adminId,
+        acao: 'ADMIN_WHATSAPP_ALTERADO',
+        entidade: 'admin',
+        entidadeId: params.id,
+        // Só os últimos dígitos — auditoria não guarda o número inteiro.
+        payload: { whatsapp: mascararWhatsapp(whatsapp) },
+        ip: ctx.ip,
+        userAgent: ctx.userAgent,
+        requestId: ctx.requestId,
+      }),
+    );
+
+    return { id: params.id, whatsapp };
   },
 });

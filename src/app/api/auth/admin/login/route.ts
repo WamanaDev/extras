@@ -1,34 +1,34 @@
 /**
- * API-AUTH-006 — `POST /api/auth/admin/login`.
+ * API-AUTH-006 — `POST /api/auth/admin/login` (etapa 1: senha).
  *
- * Login administrativo delegado ao Supabase Auth (`@supabase/ssr`), MFA
- * obrigatório. `ClienteAuthAdmin` (`src/server/auth/admin-login.ts`) isola o
- * SDK — esta rota só implementa a porta sobre o client real; a lógica de
- * MFA/auditoria vive em `processarAdminLogin`, testável sem rede.
+ * Confere a senha no Supabase Auth (`@supabase/ssr`) e manda o código de
+ * 6 dígitos pro WhatsApp do admin — o login termina em
+ * `POST /api/auth/admin/codigo/verificar`. Lógica em `processarAdminLogin`
+ * (`src/server/auth/admin-login.ts`), testável sem rede; esta rota só
+ * implementa as portas sobre o client real.
  *
- * Rate limit próprio, independente do fluxo de colaborador (`_conflitos.md`,
- * novo item sobre `login_admin_email`/`login_admin_ip` em
- * `src/server/http/rate-limit.ts`) — nunca reaproveita `login_ip`/
- * `login_matricula` (isso acoplaria os dois fluxos no mesmo balde de Redis).
+ * Rate limit próprio, independente do fluxo de colaborador
+ * (`login_admin_email`/`login_admin_ip` em `src/server/http/rate-limit.ts`)
+ * — também limita quantos códigos de WhatsApp um e-mail dispara.
  *
- * `cookies: { setAll }` aqui **grava** de volta (diferente do adaptador
- * somente-leitura de `resolverSessaoAdmin` em `src/server/http/handler.ts`,
- * usado só para *ler* sessão existente) — é esta rota quem efetivamente cria
- * a sessão do admin, então precisa deixar o `@supabase/ssr` setar o cookie de
- * sessão na resposta.
+ * `cookies: { setAll }` aqui **grava** de volta: é esta rota quem cria a
+ * sessão do Supabase. Essa sessão sozinha não vale como admin — os guardas
+ * exigem também o cookie `admin_2fa` (`src/server/auth/sessao-admin.ts`).
+ * Por isso também apaga um `admin_2fa` antigo que tenha sobrado.
  */
 import { z } from 'zod';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import type { PrismaClient } from '@prisma/client';
 import { defineHandler } from '@/server/http/handler';
 import { erroLimiteExcedido } from '@/server/http/erros';
 import { verificarRateLimit } from '@/server/http/rate-limit';
-import { emTransacao } from '@/server/db/tx';
-import { registrarAuditoria } from '@/server/audit/registrar';
 import { obterPrismaAuth } from '@/server/auth/prisma-cliente';
 import { env } from '@/env';
 import { processarAdminLogin, type ClienteAuthAdmin, type RepositorioAdminLogin } from '@/server/auth/admin-login';
+import { auditarLoginAdmin } from '@/server/auth/auditoria-login-admin';
+import { enviarCodigoAdmin } from '@/server/auth/enviar-codigo-admin';
+import { nomeDoUserMetadata } from '@/server/auth/sessao-admin';
+import { NOME_COOKIE_SEGUNDO_FATOR, sessionIdDoAccessToken, whatsappDoAppMetadata } from '@/server/auth/segundo-fator';
 
 const BodySchema = z.object({
   email: z.string().trim().email('E-mail inválido.'),
@@ -51,45 +51,17 @@ async function criarClienteAuthAdmin(): Promise<ClienteAuthAdmin> {
   return {
     async entrar(email, senha) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha });
-      if (error || !data.user) return { ok: false };
-      const metadata = data.user.user_metadata as Record<string, unknown> | undefined;
-      const nome = typeof metadata?.nome === 'string' ? metadata.nome : typeof metadata?.full_name === 'string' ? (metadata.full_name as string) : null;
-      return { ok: true, userId: data.user.id, email: data.user.email ?? email, nome };
-    },
-    async listarFatoresMfa() {
-      const { data, error } = await supabase.auth.mfa.listFactors();
-      if (error || !data) return [];
-      return data.all.map((fator) => ({ id: fator.id, status: fator.status as 'verified' | 'unverified' }));
-    },
-    async nivelAsseguranca() {
-      const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      if (error || !data) return { atual: 'aal1', proximo: 'aal1' };
-      return { atual: data.currentLevel ?? 'aal1', proximo: data.nextLevel ?? 'aal1' };
-    },
-    async desafiarFator(factorId) {
-      const { data, error } = await supabase.auth.mfa.challenge({ factorId });
-      if (error || !data) throw new Error('Falha ao iniciar desafio MFA.');
-      return data.id;
-    },
-  };
-}
-
-function criarRepositorioAdminLogin(prisma: PrismaClient, ip: string, userAgent: string, requestId: string): RepositorioAdminLogin {
-  return {
-    async auditar(evento) {
-      await emTransacao(prisma, (tx) =>
-        registrarAuditoria(tx, {
-          atorTipo: 'ADMIN',
-          atorId: evento.adminId,
-          acao: evento.sucesso ? 'LOGIN_ADMIN_SUCESSO' : 'LOGIN_ADMIN_FALHA',
-          entidade: 'admin',
-          entidadeId: evento.adminId,
-          payload: { email: evento.email },
-          ip,
-          userAgent,
-          requestId,
-        }),
-      );
+      if (error || !data.user || !data.session) return { ok: false };
+      const sessionId = sessionIdDoAccessToken(data.session.access_token);
+      if (!sessionId) return { ok: false };
+      return {
+        ok: true,
+        userId: data.user.id,
+        email: data.user.email ?? email,
+        nome: nomeDoUserMetadata(data.user.user_metadata),
+        whatsapp: whatsappDoAppMetadata(data.user.app_metadata),
+        sessionId,
+      };
     },
   };
 }
@@ -100,12 +72,18 @@ export const POST = defineHandler({
   body: BodySchema,
   cache: 'mutacao',
   handler: async ({ body, ctx }) => {
-    const limiteEmail = await verificarRateLimit('login_admin_email', body.email);
+    const limiteEmail = await verificarRateLimit('login_admin_email', body.email.toLowerCase());
     if (!limiteEmail.permitido) throw erroLimiteExcedido(limiteEmail.retryAfter);
+
+    const cookieStore = await cookies();
+    cookieStore.delete(NOME_COOKIE_SEGUNDO_FATOR);
 
     const auth = await criarClienteAuthAdmin();
     const prisma = await obterPrismaAuth();
-    const repo = criarRepositorioAdminLogin(prisma, ctx.ip, ctx.userAgent, ctx.requestId);
+    const repo: RepositorioAdminLogin = {
+      auditar: (evento) => auditarLoginAdmin(prisma, ctx, evento),
+      enviarCodigo: enviarCodigoAdmin,
+    };
 
     return processarAdminLogin(auth, repo, { email: body.email, senha: body.senha });
   },

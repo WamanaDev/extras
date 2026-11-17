@@ -7,12 +7,10 @@
  * dev, ou o e-mail nunca chega). Mesmo gap de `_conflitos.md` item 27.
  *
  * Login por senha direto no SDK do navegador (`signInWithPassword`), sem
- * passar por `POST /api/auth/admin/login` — aquela rota exige MFA já
- * cadastrado (`API-AUTH-006`, teste #2), o que é impossível na primeira vez.
- * Aqui a sessão fica em AAL1 (senha, sem MFA), suficiente para
- * `auth.updateUser`/`auth.mfa.enroll` nas duas telas seguintes. Depois de
- * cadastrar o MFA, todo login subsequente deve usar `/admin/login` (fluxo
- * completo com AAL2), nunca mais esta página.
+ * passar por `POST /api/auth/admin/login`. A sessão aberta aqui é só de
+ * senha — suficiente para `auth.updateUser` em `/admin/definir-senha`; o
+ * painel só libera depois do código do WhatsApp em `/admin/verificar`
+ * (`src/server/auth/segundo-fator.ts`). Logins seguintes usam `/admin/login`.
  */
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -45,8 +43,8 @@ export default function PrimeiroAcessoPage(): JSX.Element {
       <Logo size={40} className="mb-4" />
       <h1 className="mb-2 text-xl font-semibold text-slate-900">Primeiro acesso</h1>
       <p className="mb-6 text-sm text-slate-600">
-        Entre com o e-mail e a senha temporária que você recebeu para definir sua senha definitiva e cadastrar o
-        autenticador (MFA).
+        Entre com o e-mail e a senha temporária que você recebeu para definir sua senha definitiva. Depois, você
+        confirma o acesso com um código enviado para o seu WhatsApp.
       </p>
       <form
         className="space-y-4"

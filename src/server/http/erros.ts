@@ -59,7 +59,10 @@ export type CodigoErroInfra =
  *   `IMPACTO_NAO_CONFIRMADO` já acrescentados acima, mesmo significado).
  * - `CREDENCIAIS_INVALIDAS`, `CONTA_BLOQUEADA`, `COLABORADOR_INATIVO`,
  *   `TOKEN_INVALIDO`, `PIN_NAO_DEFINIDO`, `PIN_FRACO`, `PIN_NAO_CONFERE`,
- *   `PIN_JA_DEFINIDO`, `MFA_OBRIGATORIO`: `04-api/auth/API-AUTH-001..006`.
+ *   `PIN_JA_DEFINIDO`: `04-api/auth/API-AUTH-001..005`.
+ * - `WHATSAPP_NAO_CADASTRADO`, `WHATSAPP_INDISPONIVEL`, `CODIGO_INVALIDO`,
+ *   `CODIGO_EXPIRADO`: `API-AUTH-006` com segundo fator por WhatsApp (pedido
+ *   do usuário — substituiu `MFA_OBRIGATORIO`, do MFA TOTP do Supabase).
  * - `PLANTAO_INDISPONIVEL`, `JANELA_NAO_ABERTA`, `JANELA_ENCERRADA`,
  *   `CRUZADA_BLOQUEADA`, `EM_AUSENCIA`, `LIMITE_ATINGIDO`,
  *   `CICLO_INEXISTENTE`, `MARCACAO_INEXISTENTE`: `API-ADM-MAR-002`/`003`
@@ -94,7 +97,10 @@ export type CodigoErroNegocio =
   | 'PIN_FRACO'
   | 'PIN_NAO_CONFERE'
   | 'PIN_JA_DEFINIDO'
-  | 'MFA_OBRIGATORIO'
+  | 'WHATSAPP_NAO_CADASTRADO'
+  | 'WHATSAPP_INDISPONIVEL'
+  | 'CODIGO_INVALIDO'
+  | 'CODIGO_EXPIRADO'
   | 'PLANTAO_INDISPONIVEL'
   | 'JANELA_NAO_ABERTA'
   | 'JANELA_ENCERRADA'
@@ -257,9 +263,31 @@ export function erroPinJaDefinido(mensagem = 'PIN já definido para esta conta.'
   return new ErroHttp({ status: 409, codigo: 'PIN_JA_DEFINIDO', mensagem });
 }
 
-/** `403` — admin sem fator MFA cadastrado (`04-api/auth/API-AUTH-006`). Bloqueado até cadastrar — a conta de maior privilégio exige o segundo fator. */
-export function erroMfaObrigatorio(mensagem = 'Cadastre um fator de autenticação de dois passos para continuar.'): ErroHttp {
-  return new ErroHttp({ status: 403, codigo: 'MFA_OBRIGATORIO', mensagem });
+/** `403` — admin sem WhatsApp cadastrado para o segundo fator (`API-AUTH-006`). Só outro admin cadastra o número (`app_metadata`), nunca o próprio usuário. */
+export function erroWhatsappNaoCadastrado(
+  mensagem = 'Sua conta ainda não tem um WhatsApp cadastrado para receber o código de acesso. Peça a outro administrador para cadastrar.',
+): ErroHttp {
+  return new ErroHttp({ status: 403, codigo: 'WHATSAPP_NAO_CADASTRADO', mensagem });
+}
+
+/** `503` — falha ao enviar o código pela Evolution API. Detalhe técnico só no log (`causaOriginal`). */
+export function erroWhatsappIndisponivel(causaOriginal: unknown): ErroHttp {
+  return new ErroHttp({
+    status: 503,
+    codigo: 'WHATSAPP_INDISPONIVEL',
+    mensagem: 'Não foi possível enviar o código pelo WhatsApp agora. Tente novamente em instantes.',
+    causaOriginal,
+  });
+}
+
+/** `401` — código do WhatsApp errado (ainda há tentativas). */
+export function erroCodigoInvalido(mensagem = 'Código incorreto. Confira a mensagem no WhatsApp e tente de novo.'): ErroHttp {
+  return new ErroHttp({ status: 401, codigo: 'CODIGO_INVALIDO', mensagem });
+}
+
+/** `401` — código expirado, já usado, de outra sessão ou com tentativas esgotadas: é preciso pedir outro. */
+export function erroCodigoExpirado(mensagem = 'Código expirado ou bloqueado por tentativas demais. Peça um novo código.'): ErroHttp {
+  return new ErroHttp({ status: 401, codigo: 'CODIGO_EXPIRADO', mensagem });
 }
 
 /** `500` — erro não mapeado. Mensagem sempre genérica; o erro real vai só para `causaOriginal` (log interno, nunca resposta). */

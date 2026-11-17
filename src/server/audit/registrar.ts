@@ -97,7 +97,13 @@ export type AcaoAuditoria =
    * ainda não aceito (`DELETE /api/admin/administradores/:id`), pedido do
    * usuário. Extensão aditiva, mesmo padrão de `ADMIN_CONVIDADO` acima.
    */
-  | 'ADMIN_REVOGADO';
+  | 'ADMIN_REVOGADO'
+  /**
+   * Admin cadastra/troca o WhatsApp do segundo fator de login de um
+   * administrador (`PATCH /api/admin/administradores/:id`) — pedido do
+   * usuário. Payload só com os últimos dígitos.
+   */
+  | 'ADMIN_WHATSAPP_ALTERADO';
 
 export interface EventoAuditoria {
   atorTipo: AtorTipo;

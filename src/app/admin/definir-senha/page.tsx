@@ -6,8 +6,8 @@
  *
  * NÃO é entregável de nenhuma spec de `04-api/`/`06-frontend/` — gap real entre
  * `03-banco/migrations.md` ("Seed" cria o admin via `inviteUserByEmail`, convite
- * expira) e `API-AUTH-006`/`paginas.md` (assumem que o admin já tem senha+MFA
- * configurados, nunca descrevem como o primeiro admin chega lá). Sem esta
+ * expira) e `API-AUTH-006`/`paginas.md` (assumem que o admin já tem senha
+ * configurada, nunca descrevem como o primeiro admin chega lá). Sem esta
  * página, o convite do seed é inútil — o link do Supabase estabelece uma
  * sessão mas não existe onde defini senha. Ver `_conflitos.md`.
  *
@@ -116,7 +116,7 @@ export default function DefinirSenhaPage(): JSX.Element {
       return;
     }
     setEstado('SALVO');
-    router.push('/admin/configurar-mfa');
+    router.push('/admin/verificar');
   }
 
   if (estado === 'VERIFICANDO') {

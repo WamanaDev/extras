@@ -128,7 +128,7 @@ async function seedAdminInicial(): Promise<void> {
     );
   }
 
-  const { error } = await supabase.auth.admin.inviteUserByEmail(email, {
+  const { data: convite, error } = await supabase.auth.admin.inviteUserByEmail(email, {
     data: { precisaDefinirSenha: true, origem: "seed_referencia" },
     ...(appUrl ? { redirectTo: `${appUrl}/admin/definir-senha` } : {}),
   });
@@ -143,6 +143,19 @@ async function seedAdminInicial(): Promise<void> {
     // eslint-disable-next-line no-console
     console.log("[seed] admin inicial já existe — nada a fazer.");
     return;
+  }
+
+  // Segundo fator do login de admin é um código pelo WhatsApp
+  // (`src/server/auth/segundo-fator.ts`) — sem número o admin inicial não
+  // conclui o login. `inviteUserByEmail` não aceita `app_metadata`.
+  const whatsapp = process.env.ADMIN_INICIAL_WHATSAPP?.replace(/\D/g, "");
+  if (whatsapp && convite?.user) {
+    const comDdi = whatsapp.length <= 11 ? `55${whatsapp}` : whatsapp;
+    const { error: erroWhatsapp } = await supabase.auth.admin.updateUserById(convite.user.id, { app_metadata: { whatsapp: comDdi } });
+    if (erroWhatsapp) throw new Error(`[seed] falha ao gravar WhatsApp do admin inicial: ${erroWhatsapp.message}`);
+  } else {
+    // eslint-disable-next-line no-console
+    console.warn("[seed] ADMIN_INICIAL_WHATSAPP ausente — o admin inicial não vai conseguir concluir o login até alguém rodar scripts/admin-whatsapp.ts.");
   }
 
   // eslint-disable-next-line no-console

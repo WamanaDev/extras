@@ -29,7 +29,7 @@ adicional noturno, banco de horas.
 
 | Ator | Autenticação | Pode |
 |---|---|---|
-| Administrador | Supabase Auth (e-mail + senha + MFA) | Tudo |
+| Administrador | Supabase Auth (e-mail + senha) + código no WhatsApp | Tudo |
 | Colaborador | Matrícula + PIN | Ver própria escala, marcar/cancelar extras |
 | Sistema | — | Jobs de reconciliação, expurgo, alerta |
 

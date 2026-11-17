@@ -1,14 +1,11 @@
 'use client';
 
 /**
- * Cliente Supabase de navegador — usado só pela etapa de MFA de
- * `/admin/login` (`API-AUTH-006`). O passo de verificação do desafio MFA é
- * "fora do escopo" da rota `POST /api/auth/admin/login`
- * (`src/server/auth/admin-login.ts`, doc-comment do módulo): o cliente
- * completa via SDK do Supabase diretamente. `@supabase/ssr` sincroniza
- * cookies entre este cliente e o servidor (mesmos nomes de cookie), então a
- * sessão elevada a `aal2` aqui é a mesma que `obterSessaoAdmin` (guard do
- * layout) e `resolverSessaoAdmin` (API) leem depois.
+ * Cliente Supabase de navegador — usado pelas telas de convite/primeiro
+ * acesso (`/admin/definir-senha`, `/admin/primeiro-acesso`) e pelo logout.
+ * `@supabase/ssr` sincroniza cookies entre este cliente e o servidor (mesmos
+ * nomes de cookie). Sessão aberta aqui é só de senha — o painel ainda exige
+ * o código do WhatsApp (`src/server/auth/segundo-fator.ts`).
  */
 import { createBrowserClient } from '@supabase/ssr';
 import { env } from '@/env';
