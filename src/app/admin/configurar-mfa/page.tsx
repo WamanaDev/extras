@@ -18,12 +18,22 @@ import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/brand/Logo';
 import { obterSupabaseBrowser } from '@/lib/supabase/browser-client';
 
+/**
+ * O supabase-js devolve `totp.qr_code` como `data:image/svg+xml;utf-8,<svg…>`
+ * com o SVG sem codificar — um `#` ou `%` no markup corta/corrompe o URI.
+ * Extrai o SVG (aceita também SVG cru, caso a lib mude) e re-codifica.
+ */
+function qrCodeComoDataUri(qrCode: string): string {
+  const svg = qrCode.startsWith('data:') ? qrCode.slice(qrCode.indexOf(',') + 1) : qrCode;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
 type Estado = 'CARREGANDO' | 'JA_TEM_FATOR' | 'AGUARDANDO_CODIGO' | 'VERIFICANDO' | 'ERRO';
 
 export default function ConfigurarMfaPage(): JSX.Element {
   const router = useRouter();
   const [estado, setEstado] = useState<Estado>('CARREGANDO');
-  const [qrCodeSvg, setQrCodeSvg] = useState<string | null>(null);
+  const [qrCodeSrc, setQrCodeSrc] = useState<string | null>(null);
   const [segredo, setSegredo] = useState<string | null>(null);
   const [factorId, setFactorId] = useState<string | null>(null);
   const [codigo, setCodigo] = useState('');
@@ -65,7 +75,7 @@ export default function ConfigurarMfaPage(): JSX.Element {
         return;
       }
       setFactorId(data.id);
-      setQrCodeSvg(data.totp.qr_code);
+      setQrCodeSrc(qrCodeComoDataUri(data.totp.qr_code));
       setSegredo(data.totp.secret);
       setEstado('AGUARDANDO_CODIGO');
     })();
@@ -115,12 +125,12 @@ export default function ConfigurarMfaPage(): JSX.Element {
         Escaneie o QR code com um app autenticador (Google Authenticator, Authy, 1Password, etc).
       </p>
 
-      {qrCodeSvg ? (
-        <div
-          className="mx-auto mb-4 h-48 w-48"
-          // eslint-disable-next-line react/no-danger -- SVG vem direto do Supabase Auth (mfa.enroll), não de entrada do usuário.
-          dangerouslySetInnerHTML={{ __html: qrCodeSvg }}
-        />
+      {qrCodeSrc ? (
+        // `totp.qr_code` do supabase-js já vem como data URI
+        // (`data:image/svg+xml;utf-8,<svg…>`), não SVG cru — injetar via
+        // innerHTML mostrava o texto do URI em vez da imagem.
+        // eslint-disable-next-line @next/next/no-img-element -- data URI, nada a otimizar.
+        <img src={qrCodeSrc} alt="QR code para o app autenticador" className="mx-auto mb-4 h-48 w-48 bg-white" />
       ) : null}
 
       {segredo ? (
