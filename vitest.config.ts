@@ -2,18 +2,38 @@ import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
 
+// Vitest 4 removeu `environmentMatchGlobs`: o ambiente por glob agora é
+// feito com `projects` (cada projeto herda a config raiz via `extends`).
+const jsdomGlobs = [
+  "src/components/**/*.test.tsx",
+  "src/app/**/*.test.tsx",
+  "src/hooks/**/*.test.ts",
+  "src/hooks/**/*.test.tsx",
+];
+
 export default defineConfig({
   plugins: [react()],
   test: {
-    environment: "node",
-    environmentMatchGlobs: [
-      ["src/components/**/*.test.tsx", "jsdom"],
-      ["src/app/**/*.test.tsx", "jsdom"],
-      ["src/hooks/**/*.test.ts", "jsdom"],
-      ["src/hooks/**/*.test.tsx", "jsdom"],
-    ],
     setupFiles: ["./vitest.setup.ts"],
-    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "jsdom",
+          environment: "jsdom",
+          include: jsdomGlobs,
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "node",
+          environment: "node",
+          include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+          exclude: jsdomGlobs,
+        },
+      },
+    ],
   },
   resolve: {
     alias: {

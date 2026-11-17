@@ -10,7 +10,10 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const PrismaClientMock = vi.fn().mockImplementation((opcoes?: unknown) => ({ __opcoes: opcoes }));
+// Vitest 4: `vi.fn` com arrow function não pode ser usado com `new`; usa `function`.
+const PrismaClientMock = vi.fn().mockImplementation(function (opcoes?: unknown) {
+  return { __opcoes: opcoes };
+});
 
 vi.mock('@prisma/client', () => ({ PrismaClient: PrismaClientMock }));
 

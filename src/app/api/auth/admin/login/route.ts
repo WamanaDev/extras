@@ -18,6 +18,7 @@
  */
 import { z } from 'zod';
 import { createServerClient } from '@supabase/ssr';
+import type { SetAllCookies } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { defineHandler } from '@/server/http/handler';
 import { erroLimiteExcedido } from '@/server/http/erros';
@@ -40,7 +41,7 @@ async function criarClienteAuthAdmin(): Promise<ClienteAuthAdmin> {
   const supabase = createServerClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
     cookies: {
       getAll: () => cookieStore.getAll().map((c) => ({ name: c.name, value: c.value })),
-      setAll: (cookiesToSet) => {
+      setAll: (cookiesToSet: Parameters<SetAllCookies>[0]) => {
         for (const { name, value, options } of cookiesToSet) {
           cookieStore.set(name, value, options);
         }
