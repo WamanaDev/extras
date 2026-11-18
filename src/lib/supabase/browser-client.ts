@@ -4,8 +4,8 @@
  * Cliente Supabase de navegador — usado pelas telas de convite/primeiro
  * acesso (`/admin/definir-senha`, `/admin/primeiro-acesso`) e pelo logout.
  * `@supabase/ssr` sincroniza cookies entre este cliente e o servidor (mesmos
- * nomes de cookie). Sessão aberta aqui é só de senha — o painel ainda exige
- * o código do WhatsApp (`src/server/auth/segundo-fator.ts`).
+ * nomes de cookie). Sessão aberta aqui (senha) já vale como
+ * sessão de admin.
  */
 import { createBrowserClient } from '@supabase/ssr';
 import { env } from '@/env';

@@ -1,49 +1,43 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { post, type ErroApi } from '@/lib/api/client';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/brand/Logo';
-import { VerificacaoWhatsapp } from '@/components/admin/VerificacaoWhatsapp';
 
 /**
  * `/admin/login` — FE-001, API-AUTH-006.
  *
- * Duas etapas: (1) e-mail + senha via `POST /api/auth/admin/login`, que já
- * manda o código pro WhatsApp do admin; (2) o código de 6 dígitos
- * (`<VerificacaoWhatsapp />` → `POST /api/auth/admin/codigo/verificar`).
- * Segundo fator por WhatsApp em vez de app autenticador — pedido do
- * usuário, ver `src/server/auth/segundo-fator.ts`.
+ * Etapa única: e-mail + senha via `POST /api/auth/admin/login`; com sucesso,
+ * vai para `/admin`. Ver `_conflitos.md` sobre o nível de
+ * proteção do login de admin.
  *
- * FE-001.8: senha e código nunca tocam localStorage/sessionStorage/URL —
- * só corpo de requisição, em memória de componente.
+ * FE-001.8: a senha nunca toca localStorage/sessionStorage/URL — só corpo de
+ * requisição, em memória de componente.
  */
-type Etapa = 'CREDENCIAIS' | 'CODIGO';
-
 interface RespostaLogin {
-  precisaCodigo: true;
-  destino: string;
+  admin: { id: string; email: string; nome: string | null };
 }
 
 export default function AdminLoginPage(): JSX.Element {
-  const [etapa, setEtapa] = useState<Etapa>('CREDENCIAIS');
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
-  const [destino, setDestino] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<ErroApi | string | null>(null);
 
-  async function entrarComSenha(): Promise<void> {
+  async function entrar(): Promise<void> {
     setEnviando(true);
     setErro(null);
     const resultado = await post<RespostaLogin>('/api/auth/admin/login', { email, senha });
-    setEnviando(false);
     if (!resultado.ok) {
+      setEnviando(false);
       setErro(resultado.erro);
       return;
     }
-    setDestino(resultado.dados.destino);
-    setEtapa('CODIGO');
+    router.push('/admin');
+    router.refresh();
   }
 
   const mensagemErro = typeof erro === 'string' ? erro : erro?.mensagem;
@@ -53,12 +47,11 @@ export default function AdminLoginPage(): JSX.Element {
       <Logo size={40} className="mb-4" />
       <h1 className="mb-6 text-xl font-semibold text-slate-900">Acesso administrativo</h1>
 
-      {etapa === 'CREDENCIAIS' ? (
-        <form
+      <form
           className="space-y-4"
           onSubmit={(evento) => {
             evento.preventDefault();
-            void entrarComSenha();
+            void entrar();
           }}
         >
           <label className="flex flex-col text-sm">
@@ -96,10 +89,7 @@ export default function AdminLoginPage(): JSX.Element {
           <a href="/admin/recuperar-senha" className="block text-center text-sm text-slate-600 underline">
             Esqueci minha senha
           </a>
-        </form>
-      ) : (
-        <VerificacaoWhatsapp destino={destino} onVoltar={() => setEtapa('CREDENCIAIS')} />
-      )}
+      </form>
 
       <p className="mt-6 text-center text-xs text-slate-400">
         <a href="/privacidade" className="underline hover:text-slate-600">

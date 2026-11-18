@@ -7,10 +7,7 @@
  * Mesmo mecanismo de `prisma/seed.ts` (`seedAdminInicial`):
  * `auth.admin.inviteUserByEmail` — o Supabase manda o e-mail de convite com
  * o link de `/admin/definir-senha`, nunca gera nem loga senha em claro
- * (SEC-CONF). Depois de definir a senha, o convidado confirma o código
- * enviado pro WhatsApp que quem convidou cadastrou (`app_metadata.whatsapp`,
- * ver `src/server/auth/segundo-fator.ts`) — só a service role escreve ali,
- * então o próprio usuário nunca troca o número.
+ * (SEC-CONF). Depois de definir a senha, o convidado já entra no painel.
  *
  * "Admin" aqui é literal: **qualquer** conta do Supabase Auth deste projeto
  * é um admin (não existe papel/role separado — `resolverSessaoAdmin`,
@@ -18,7 +15,6 @@
  * `listarAdministradores` é `auth.admin.listUsers()` sem filtro nenhum.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { whatsappDoAppMetadata } from './segundo-fator';
 
 export interface AdministradorListado {
   id: string;
@@ -26,8 +22,6 @@ export interface AdministradorListado {
   nome: string | null;
   criadoEm: string;
   ultimoLoginEm: string | null;
-  /** `app_metadata.whatsapp` normalizado (só dígitos, com DDI), ou `null`. */
-  whatsapp: string | null;
   /** Nunca fez login — convite ainda não aceito (`ultimoLoginEm === null`). */
   pendente: boolean;
 }
@@ -35,8 +29,6 @@ export interface AdministradorListado {
 export interface EntradaConvidarAdministrador {
   email: string;
   nome?: string;
-  /** Já normalizado (`normalizarWhatsapp`). */
-  whatsapp: string;
   /**
    * Pra onde o link do e-mail de convite leva depois de autenticar
    * (`/admin/definir-senha`, absoluto — ex. `https://app.exemplo.com/admin/definir-senha`).
@@ -68,7 +60,6 @@ export async function listarAdministradores(supabase: SupabaseClient): Promise<A
       nome: typeof nome === 'string' ? nome : null,
       criadoEm: usuario.created_at,
       ultimoLoginEm,
-      whatsapp: whatsappDoAppMetadata(usuario.app_metadata),
       pendente: ultimoLoginEm === null,
     };
   });
@@ -103,14 +94,5 @@ export async function convidarAdministrador(
     throw new Error(error.message);
   }
 
-  // `inviteUserByEmail` não aceita `app_metadata` — grava logo em seguida.
-  await definirWhatsappAdministrador(supabase, data.user.id, entrada.whatsapp);
-
   return { id: data.user.id, email: data.user.email ?? null };
-}
-
-/** Grava o WhatsApp do segundo fator em `app_metadata` (mescla — não apaga outras chaves como `provider`). */
-export async function definirWhatsappAdministrador(supabase: SupabaseClient, id: string, whatsapp: string): Promise<void> {
-  const { error } = await supabase.auth.admin.updateUserById(id, { app_metadata: { whatsapp } });
-  if (error) throw new Error(error.message);
 }

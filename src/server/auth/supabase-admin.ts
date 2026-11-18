@@ -1,7 +1,7 @@
 /**
  * Cliente Supabase com a service role key — só pra Admin API
  * (`auth.admin.*`: convidar, listar, revogar). Admin não tem tabela própria
- * no Prisma (`FUND-003`, "Auth admin: Supabase Auth + MFA" — ver
+ * no Prisma (`FUND-003`, "Auth admin: Supabase Auth" — ver
  * `prisma/seed.ts`, `seedAdminInicial`, mesmo padrão que este módulo
  * reaproveita em vez de duplicar `createClient` ad hoc). Singleton por
  * processo, mesmo racional de `src/server/realtime/broadcast.ts`.

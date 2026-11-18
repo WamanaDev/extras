@@ -11,7 +11,7 @@
 | ORM | Prisma | Migrations versionadas; SQL cru via `$queryRaw` onde precisa |
 | Realtime | Supabase Realtime | Postgres Changes + Broadcast |
 | Cache / rate limit | Upstash Redis | Serverless, latência baixa |
-| Auth admin | Supabase Auth (senha) + código no WhatsApp (Evolution API) | Pronto, auditável; WhatsApp tem menos atrito que app autenticador |
+| Auth admin | Supabase Auth (e-mail + senha) | Pronto e auditável; sem segundo fator por ora (decisão do produto, `_conflitos.md`) |
 | Auth colaborador | Própria (matrícula + PIN) | Colaborador não tem e-mail corporativo |
 | Validação | Zod | Schema compartilhado entre borda e serviço |
 | UI | Tailwind + primitivos próprios no espírito shadcn/ui | Velocidade |

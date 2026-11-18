@@ -1,20 +1,17 @@
 /**
- * API-AUTH-006 — `POST /api/auth/admin/login` (etapa 1: senha).
+ * API-AUTH-006 — `POST /api/auth/admin/login`.
  *
- * Confere a senha no Supabase Auth (`@supabase/ssr`) e manda o código de
- * 6 dígitos pro WhatsApp do admin — o login termina em
- * `POST /api/auth/admin/codigo/verificar`. Lógica em `processarAdminLogin`
- * (`src/server/auth/admin-login.ts`), testável sem rede; esta rota só
- * implementa as portas sobre o client real.
+ * Confere e-mail + senha no Supabase Auth (`@supabase/ssr`) — sem segundo
+ * fator, por decisão do produto (`_conflitos.md`). Lógica em
+ * `processarAdminLogin` (`src/server/auth/admin-login.ts`), testável sem
+ * rede; esta rota só implementa as portas sobre o client real.
  *
  * Rate limit próprio, independente do fluxo de colaborador
- * (`login_admin_email`/`login_admin_ip` em `src/server/http/rate-limit.ts`)
- * — também limita quantos códigos de WhatsApp um e-mail dispara.
+ * (`login_admin_email`/`login_admin_ip` em `src/server/http/rate-limit.ts`).
  *
  * `cookies: { setAll }` aqui **grava** de volta: é esta rota quem cria a
- * sessão do Supabase. Essa sessão sozinha não vale como admin — os guardas
- * exigem também o cookie `admin_2fa` (`src/server/auth/sessao-admin.ts`).
- * Por isso também apaga um `admin_2fa` antigo que tenha sobrado.
+ * sessão do Supabase, que os guardas (`src/server/auth/sessao-admin.ts`)
+ * passam a aceitar.
  */
 import { z } from 'zod';
 import { createServerClient } from '@supabase/ssr';
@@ -27,9 +24,7 @@ import { obterPrismaAuth } from '@/server/auth/prisma-cliente';
 import { env } from '@/env';
 import { processarAdminLogin, type ClienteAuthAdmin, type RepositorioAdminLogin } from '@/server/auth/admin-login';
 import { auditarLoginAdmin } from '@/server/auth/auditoria-login-admin';
-import { enviarCodigoAdmin } from '@/server/auth/enviar-codigo-admin';
 import { nomeDoUserMetadata } from '@/server/auth/sessao-admin';
-import { NOME_COOKIE_SEGUNDO_FATOR, sessionIdDoAccessToken, whatsappDoAppMetadata } from '@/server/auth/segundo-fator';
 
 const BodySchema = z.object({
   email: z.string().trim().email('E-mail inválido.'),
@@ -53,15 +48,11 @@ async function criarClienteAuthAdmin(): Promise<ClienteAuthAdmin> {
     async entrar(email, senha) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha });
       if (error || !data.user || !data.session) return { ok: false };
-      const sessionId = sessionIdDoAccessToken(data.session.access_token);
-      if (!sessionId) return { ok: false };
       return {
         ok: true,
         userId: data.user.id,
         email: data.user.email ?? email,
         nome: nomeDoUserMetadata(data.user.user_metadata),
-        whatsapp: whatsappDoAppMetadata(data.user.app_metadata),
-        sessionId,
       };
     },
   };
@@ -76,14 +67,10 @@ export const POST = defineHandler({
     const limiteEmail = await verificarRateLimit('login_admin_email', body.email.toLowerCase());
     if (!limiteEmail.permitido) throw erroLimiteExcedido(limiteEmail.retryAfter);
 
-    const cookieStore = await cookies();
-    cookieStore.delete(NOME_COOKIE_SEGUNDO_FATOR);
-
     const auth = await criarClienteAuthAdmin();
     const prisma = await obterPrismaAuth();
     const repo: RepositorioAdminLogin = {
       auditar: (evento) => auditarLoginAdmin(prisma, ctx, evento),
-      enviarCodigo: enviarCodigoAdmin,
     };
 
     return processarAdminLogin(auth, repo, { email: body.email, senha: body.senha });

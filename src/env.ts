@@ -95,14 +95,6 @@ const serverSchema = z.object({
     .string()
     .regex(/^[0-9a-fA-F]{64}$/, 'CALENDAR_TOKEN_KEY deve ter 64 caracteres hexadecimais (32 bytes) — gerar com `openssl rand -hex 32`.')
     .optional(),
-  // Evolution API (WhatsApp) — segundo fator do login de admin (pedido do
-  // usuário: código pelo WhatsApp em vez de app autenticador). Ver
-  // `src/server/integracoes/evolution.ts`. Opcionais no boot (mesmo padrão
-  // de VAPID/Google acima), mas sem elas nenhum admin conclui o login em
-  // produção — em `development` o código vai pro console do servidor.
-  EVOLUTION_API_URL: z.string().url("EVOLUTION_API_URL deve ser uma URL válida").optional(),
-  EVOLUTION_API_KEY: z.string().optional(),
-  EVOLUTION_INSTANCE: z.string().optional(),
 });
 
 const clientSchema = z.object({

@@ -69,7 +69,7 @@ Supabase — toda rota admin caía em `403 SEM_PERMISSAO` mesmo com login de adm
 
 Sessão do colaborador: cookie `sessao_colaborador` (espelha o nome da tabela
 `sessao_colaborador`), comparado via hash contra `sessao_colaborador.token_hash`
-(`src/server/auth/credenciais.ts`). Sessão de admin: `@supabase/ssr` (Supabase Auth + código no WhatsApp via cookie `admin_2fa`,
+(`src/server/auth/credenciais.ts`). Sessão de admin: `@supabase/ssr` (Supabase Auth, e-mail + senha,
 `00-fundacao/stack.md`), sem nome de cookie próprio — a biblioteca gerencia isso.
 
 ## Erros

@@ -15,11 +15,6 @@
  * ver docstring de `revogarAdministrador`. Nunca mostra o botão na própria
  * linha (busca a própria identidade via `GET /api/auth/me`) — a API também
  * recusa (`NAO_PODE_REVOGAR_A_SI_MESMO`), isso aqui só evita a tentativa.
- *
- * WhatsApp (pedido do usuário): o segundo fator de login é um código pelo
- * WhatsApp (`src/server/auth/segundo-fator.ts`). O número é obrigatório no
- * convite e só é cadastrado/trocado aqui, por um admin já logado — nunca
- * pelo próprio convidado.
  */
 import { useState } from 'react';
 import { useRecursoApi } from '@/lib/api/use-recurso';
@@ -27,7 +22,7 @@ import { EstadoCarregando, EstadoErro, EstadoVazio } from '@/components/admin/Es
 import { ConfirmacaoImpacto } from '@/components/comum/ConfirmacaoImpacto';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { post, patch, del, type ErroApi } from '@/lib/api/client';
+import { post, del, type ErroApi } from '@/lib/api/client';
 
 interface AdministradorListado {
   id: string;
@@ -35,19 +30,12 @@ interface AdministradorListado {
   nome: string | null;
   criadoEm: string;
   ultimoLoginEm: string | null;
-  whatsapp: string | null;
   pendente: boolean;
 }
 
 interface RespostaMe {
   tipo: 'ADMIN' | 'COLABORADOR';
   admin?: { id: string };
-}
-
-/** `5511987654321` → `+55 (11) 98765-4321`; outros formatos ficam como vieram. */
-function formatarWhatsapp(numero: string): string {
-  const m = /^55(\d{2})(\d{4,5})(\d{4})$/.exec(numero);
-  return m ? `+55 (${m[1]}) ${m[2]}-${m[3]}` : `+${numero}`;
 }
 
 function formatarData(iso: string | null): string {
@@ -62,7 +50,6 @@ export default function AdministradoresPage(): JSX.Element {
 
   const [email, setEmail] = useState('');
   const [nome, setNome] = useState('');
-  const [whatsapp, setWhatsapp] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<ErroApi | null>(null);
   const [sucesso, setSucesso] = useState<string | null>(null);
@@ -71,24 +58,6 @@ export default function AdministradoresPage(): JSX.Element {
   const [revogando, setRevogando] = useState(false);
   const [erroRevogar, setErroRevogar] = useState<string | null>(null);
 
-  const [editandoWhatsapp, setEditandoWhatsapp] = useState<{ id: string; valor: string } | null>(null);
-  const [salvandoWhatsapp, setSalvandoWhatsapp] = useState(false);
-  const [erroWhatsapp, setErroWhatsapp] = useState<string | null>(null);
-
-  async function salvarWhatsapp(): Promise<void> {
-    if (!editandoWhatsapp) return;
-    setSalvandoWhatsapp(true);
-    setErroWhatsapp(null);
-    const resultado = await patch(`/api/admin/administradores/${editandoWhatsapp.id}`, { whatsapp: editandoWhatsapp.valor });
-    setSalvandoWhatsapp(false);
-    if (!resultado.ok) {
-      setErroWhatsapp(resultado.erro.detalhes?.whatsapp ?? resultado.erro.mensagem);
-      return;
-    }
-    setEditandoWhatsapp(null);
-    administradores.recarregar();
-  }
-
   async function convidar(): Promise<void> {
     setEnviando(true);
     setErro(null);
@@ -96,7 +65,6 @@ export default function AdministradoresPage(): JSX.Element {
 
     const resultado = await post<{ administrador: { email: string | null } }>('/api/admin/administradores', {
       email: email.trim(),
-      whatsapp: whatsapp.trim(),
       ...(nome.trim() ? { nome: nome.trim() } : {}),
     });
 
@@ -110,7 +78,6 @@ export default function AdministradoresPage(): JSX.Element {
     setSucesso(`Convite enviado para ${resultado.dados.administrador.email}.`);
     setEmail('');
     setNome('');
-    setWhatsapp('');
     administradores.recarregar();
   }
 
@@ -155,30 +122,18 @@ export default function AdministradoresPage(): JSX.Element {
             Nome (opcional)
             <input value={nome} onChange={(e) => setNome(e.target.value)} className="w-56 rounded border border-slate-300 p-2" />
           </label>
-          <label className="flex flex-col text-sm">
-            WhatsApp
-            <input
-              type="tel"
-              required
-              placeholder="(11) 98765-4321"
-              value={whatsapp}
-              onChange={(e) => setWhatsapp(e.target.value)}
-              className="w-48 rounded border border-slate-300 p-2"
-            />
-          </label>
-          <Button type="submit" disabled={enviando || !email.trim() || !whatsapp.trim()} aria-busy={enviando}>
+          <Button type="submit" disabled={enviando || !email.trim()} aria-busy={enviando}>
             {enviando ? 'Enviando…' : 'Enviar convite'}
           </Button>
         </form>
         <p className="mt-2 text-xs text-slate-500">
-          O convite chega por e-mail com um link para definir a senha. Todo login pede também um código enviado para o
-          WhatsApp informado aqui. Se o e-mail não
+          O convite chega por e-mail com um link para definir a senha. Se o e-mail não
           chegar (ex.: ambiente de teste), o convidado pode entrar por <code>/admin/primeiro-acesso</code> com a senha
           temporária recebida.
         </p>
         {erro ? (
           <p role="alert" className="mt-2 text-sm text-red-800">
-            {erro.detalhes?.whatsapp ?? erro.mensagem}
+            {erro.mensagem}
           </p>
         ) : null}
         {sucesso ? (
@@ -206,7 +161,6 @@ export default function AdministradoresPage(): JSX.Element {
                   <th className="p-2">Status</th>
                   <th className="p-2">Convidado em</th>
                   <th className="p-2">Último acesso</th>
-                  <th className="p-2">WhatsApp</th>
                   <th className="p-2" />
                 </tr>
               </thead>
@@ -224,57 +178,6 @@ export default function AdministradoresPage(): JSX.Element {
                     </td>
                     <td className="p-2">{formatarData(a.criadoEm)}</td>
                     <td className="p-2">{formatarData(a.ultimoLoginEm)}</td>
-                    <td className="p-2">
-                      {editandoWhatsapp?.id === a.id ? (
-                        <form
-                          className="flex flex-col gap-1"
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            void salvarWhatsapp();
-                          }}
-                        >
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="tel"
-                              autoFocus
-                              placeholder="(11) 98765-4321"
-                              value={editandoWhatsapp.valor}
-                              onChange={(e) => setEditandoWhatsapp({ id: a.id, valor: e.target.value })}
-                              className="w-40 rounded border border-slate-300 p-1"
-                            />
-                            <Button type="submit" size="sm" disabled={salvandoWhatsapp || !editandoWhatsapp.valor.trim()}>
-                              {salvandoWhatsapp ? 'Salvando…' : 'Salvar'}
-                            </Button>
-                            <Button type="button" size="sm" variant="ghost" onClick={() => setEditandoWhatsapp(null)} disabled={salvandoWhatsapp}>
-                              Cancelar
-                            </Button>
-                          </div>
-                          {erroWhatsapp ? (
-                            <span role="alert" className="text-xs text-red-800">
-                              {erroWhatsapp}
-                            </span>
-                          ) : null}
-                        </form>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          {a.whatsapp ? (
-                            <span className="whitespace-nowrap">{formatarWhatsapp(a.whatsapp)}</span>
-                          ) : (
-                            <Badge variant="secondary">Não cadastrado</Badge>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              setErroWhatsapp(null);
-                              setEditandoWhatsapp({ id: a.id, valor: a.whatsapp ? formatarWhatsapp(a.whatsapp) : '' });
-                            }}
-                          >
-                            {a.whatsapp ? 'Alterar' : 'Cadastrar'}
-                          </Button>
-                        </div>
-                      )}
-                    </td>
                     <td className="p-2 text-right">
                       {a.id !== meuId ? (
                         <Button

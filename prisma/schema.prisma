@@ -28,8 +28,7 @@
 // valor de qualquer forma antes da linha ser gravada. O default é só uma
 // válvula de escape de tipagem, nunca a fonte do valor real.
 //
-// `ADMIN` não é tabela própria: FUND-003 define "Auth admin: Supabase Auth +
-// MFA" — a identidade do admin vive em `auth.users` (schema gerenciado pelo
+// `ADMIN` não é tabela própria: FUND-003 define "Auth admin: Supabase Auth" — a identidade do admin vive em `auth.users` (schema gerenciado pelo
 // Supabase), fora deste schema.prisma. `audit_log.ator_id` e
 // `marcacao.origem` não têm FK para uma tabela "admin" porque ela não existe
 // aqui; é o uuid de `auth.users` quando `ator_tipo = ADMIN`.

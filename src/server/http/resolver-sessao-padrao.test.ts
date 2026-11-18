@@ -39,22 +39,13 @@ vi.mock('@prisma/client', () => ({
 }));
 
 const getUserMock = vi.fn(async () => ({ data: { user: null as { id: string; email: string } | null }, error: null as unknown }));
-// Access token com a claim `session_id` — o cookie `admin_2fa` fica preso a ela.
-const ACCESS_TOKEN = `h.${Buffer.from(JSON.stringify({ session_id: 'sb-sessao-1' })).toString('base64url')}.s`;
 vi.mock('@supabase/ssr', () => ({
   createServerClient: () => ({
     auth: {
       getUser: () => getUserMock(),
-      getSession: async () => ({ data: { session: { access_token: ACCESS_TOKEN } }, error: null }),
     },
   }),
 }));
-
-/** Cookie do segundo fator (código do WhatsApp) válido para `admin-1` nesta sessão. */
-async function cookieSegundoFator(): Promise<Record<string, string>> {
-  const { assinarCookieSegundoFator, NOME_COOKIE_SEGUNDO_FATOR } = await import('@/server/auth/segundo-fator');
-  return { [NOME_COOKIE_SEGUNDO_FATOR]: assinarCookieSegundoFator(process.env.SESSION_SECRET!, 'admin-1', 'sb-sessao-1', new Date()) };
-}
 
 function req(cookies: Record<string, string>): NextRequest {
   const cookieHeader = Object.entries(cookies)
@@ -80,23 +71,9 @@ describe('resolverSessaoPadrao — prioridade quando os dois cookies existem', (
   it('atorEsperado ADMIN: com cookie de colaborador E de admin válidos, a sessão de ADMIN vence (não derruba mais rota admin com SEM_PERMISSAO)', async () => {
     getUserMock.mockResolvedValue({ data: { user: { id: 'admin-1', email: 'admin@exemplo.com' } }, error: null });
 
-    const sessao = await resolverSessaoPadrao(req({ sessao_colaborador: 'token-valido', ...(await cookieSegundoFator()) }), '127.0.0.1', 'ADMIN');
+    const sessao = await resolverSessaoPadrao(req({ sessao_colaborador: 'token-valido' }), '127.0.0.1', 'ADMIN');
 
     expect(sessao?.tipo).toBe('ADMIN');
-  });
-
-  it('atorEsperado ADMIN: sessão do Supabase só com senha (sem o código do WhatsApp) NÃO é admin', async () => {
-    findFirstMock.mockResolvedValue(null);
-    getUserMock.mockResolvedValue({ data: { user: { id: 'admin-1', email: 'admin@exemplo.com' } }, error: null });
-
-    expect(await resolverSessaoPadrao(req({}), '127.0.0.1', 'ADMIN')).toBeNull();
-  });
-
-  it('atorEsperado ADMIN: cookie admin_2fa de outro usuário não vale', async () => {
-    findFirstMock.mockResolvedValue(null);
-    getUserMock.mockResolvedValue({ data: { user: { id: 'admin-2', email: 'outro@exemplo.com' } }, error: null });
-
-    expect(await resolverSessaoPadrao(req(await cookieSegundoFator()), '127.0.0.1', 'ADMIN')).toBeNull();
   });
 
   it('atorEsperado ADMIN: sem cookie de admin válido, cai pro colaborador em vez de negar tudo', async () => {
@@ -121,5 +98,16 @@ describe('resolverSessaoPadrao — prioridade quando os dois cookies existem', (
 
     expect(await resolverSessaoPadrao(req({}), '127.0.0.1', 'ADMIN')).toBeNull();
     expect(await resolverSessaoPadrao(req({}), '127.0.0.1', 'COLABORADOR')).toBeNull();
+  });
+});
+
+describe('resolverSessaoPadrao — sessão de admin', () => {
+  it('atorEsperado ADMIN: sessão válida do Supabase (só e-mail + senha) já é admin', async () => {
+    findFirstMock.mockResolvedValue(null);
+    getUserMock.mockResolvedValue({ data: { user: { id: 'admin-1', email: 'admin@exemplo.com' } }, error: null });
+
+    const sessao = await resolverSessaoPadrao(req({}), '127.0.0.1', 'ADMIN');
+
+    expect(sessao).toMatchObject({ tipo: 'ADMIN', adminId: 'admin-1', email: 'admin@exemplo.com' });
   });
 });

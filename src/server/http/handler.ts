@@ -145,18 +145,14 @@ function obterPrismaSingleton(PrismaClientCtor: new () => any): any {
 }
 
 /**
- * Sessão de admin: Supabase Auth (senha) **e** segundo fator por WhatsApp
- * (cookie `admin_2fa`) — ver `src/server/auth/sessao-admin.ts`. Sessão do
- * Supabase sem o segundo fator verificado não é admin: antes desta regra,
- * a rota de login gravava a sessão logo após a senha e qualquer rota
- * `ADMIN` já a aceitava, pulando o segundo fator por completo.
+ * Sessão de admin: sessão válida do Supabase Auth (e-mail + senha) — ver
+ * `src/server/auth/sessao-admin.ts`.
  */
 async function resolverSessaoAdmin(request: NextRequest): Promise<AtorAdmin | null> {
   const { lerSessaoAdmin } = await import('@/server/auth/sessao-admin');
-  const resultado = await lerSessaoAdmin(request.cookies.getAll().map((c) => ({ name: c.name, value: c.value })));
-  if (resultado.estado !== 'VERIFICADA') return null;
-  const { id, email, nome } = resultado.usuario;
-  return { tipo: 'ADMIN', adminId: id, email, nome };
+  const sessao = await lerSessaoAdmin(request.cookies.getAll().map((c) => ({ name: c.name, value: c.value })));
+  if (!sessao) return null;
+  return { tipo: 'ADMIN', adminId: sessao.id, email: sessao.email, nome: sessao.nome };
 }
 
 /**

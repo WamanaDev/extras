@@ -7,10 +7,9 @@
  * dev, ou o e-mail nunca chega). Mesmo gap de `_conflitos.md` item 27.
  *
  * Login por senha direto no SDK do navegador (`signInWithPassword`), sem
- * passar por `POST /api/auth/admin/login`. A sessão aberta aqui é só de
- * senha — suficiente para `auth.updateUser` em `/admin/definir-senha`; o
- * painel só libera depois do código do WhatsApp em `/admin/verificar`
- * (`src/server/auth/segundo-fator.ts`). Logins seguintes usam `/admin/login`.
+ * passar por `POST /api/auth/admin/login`. A sessão aberta aqui é suficiente
+ * para `auth.updateUser` em `/admin/definir-senha`, que depois leva a
+ * `/admin`. Logins seguintes usam `/admin/login`.
  */
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -43,8 +42,8 @@ export default function PrimeiroAcessoPage(): JSX.Element {
       <Logo size={40} className="mb-4" />
       <h1 className="mb-2 text-xl font-semibold text-slate-900">Primeiro acesso</h1>
       <p className="mb-6 text-sm text-slate-600">
-        Entre com o e-mail e a senha temporária que você recebeu para definir sua senha definitiva. Depois, você
-        confirma o acesso com um código enviado para o seu WhatsApp.
+        Entre com o e-mail e a senha temporária que você recebeu para definir sua senha definitiva. Depois de salvar,
+        você já entra no painel.
       </p>
       <form
         className="space-y-4"

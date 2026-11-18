@@ -16,7 +16,6 @@ import { emTransacao } from '@/server/db/tx';
 import { registrarAuditoria } from '@/server/audit/registrar';
 import { obterPrisma } from '@/server/db/client';
 import { obterSupabaseAdmin } from '@/server/auth/supabase-admin';
-import { normalizarWhatsapp } from '@/server/auth/segundo-fator';
 import { listarAdministradores, convidarAdministrador, ehEmailJaExistente } from '@/server/auth/administradores';
 
 export const GET = defineHandler({
@@ -31,15 +30,6 @@ export const GET = defineHandler({
 
 const ConvidarSchema = z.object({
   email: z.string().trim().email('E-mail inválido.'),
-  // Obrigatório: sem ele o convidado não consegue concluir o login (segundo fator por WhatsApp).
-  whatsapp: z.string().transform((valor, contexto) => {
-    const normalizado = normalizarWhatsapp(valor);
-    if (!normalizado) {
-      contexto.addIssue({ code: z.ZodIssueCode.custom, message: 'WhatsApp inválido. Use DDD + número, ex.: (11) 98765-4321.' });
-      return z.NEVER;
-    }
-    return normalizado;
-  }),
   nome: z.string().trim().min(1).max(200).optional(),
 });
 
@@ -59,7 +49,6 @@ export const POST = defineHandler({
     try {
       convidado = await convidarAdministrador(obterSupabaseAdmin(), {
         email: body.email,
-        whatsapp: body.whatsapp,
         redirectTo,
         ...(body.nome !== undefined ? { nome: body.nome } : {}),
       });

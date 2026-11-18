@@ -2,7 +2,9 @@
 
 /**
  * `/admin/definir-senha` — aceitação do convite inicial do admin (`prisma/seed.ts`,
- * `seedAdminInicial`) e troca de senha manual depois.
+ * `seedAdminInicial`) e troca de senha manual depois. A sessão do Supabase já
+ * existe (link de convite/recuperação ou `/admin/primeiro-acesso`); depois de
+ * salvar a senha, segue direto para `/admin`.
  *
  * NÃO é entregável de nenhuma spec de `04-api/`/`06-frontend/` — gap real entre
  * `03-banco/migrations.md` ("Seed" cria o admin via `inviteUserByEmail`, convite
@@ -116,7 +118,7 @@ export default function DefinirSenhaPage(): JSX.Element {
       return;
     }
     setEstado('SALVO');
-    router.push('/admin/verificar');
+    router.push('/admin');
   }
 
   if (estado === 'VERIFICANDO') {

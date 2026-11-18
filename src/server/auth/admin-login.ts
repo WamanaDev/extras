@@ -1,29 +1,19 @@
 /**
  * API-AUTH-006 — `POST /api/auth/admin/login`: lógica de negócio.
  *
- * Login administrativo em duas etapas — senha no Supabase Auth + código de
- * 6 dígitos pelo WhatsApp (pedido do usuário: substituiu o MFA TOTP do
- * Supabase, que era atrito demais para a equipe). Ver
- * `./segundo-fator.ts` para o fluxo completo.
+ * Login administrativo só com e-mail e senha (decisão do produto: por ora
+ * não há segundo fator — ver `_conflitos.md`).
  *
- * Esta etapa (senha):
  * 1. Delegar ao Supabase Auth (`ClienteAuthAdmin.entrar`). Senha errada →
- *    `CREDENCIAIS_INVALIDAS` + auditoria `LOGIN_ADMIN_FALHA`.
- * 2. Sem WhatsApp cadastrado (`app_metadata.whatsapp`) → `WHATSAPP_NAO_CADASTRADO`
- *    (403): a conta não opera sem segundo fator.
- * 3. Envia o código e devolve `{ precisaCodigo: true, destino }` — o login
- *    só termina (e só audita `LOGIN_ADMIN_SUCESSO`) em
- *    `POST /api/auth/admin/codigo/verificar`.
+ *    `CREDENCIAIS_INVALIDAS` (401) + auditoria `LOGIN_ADMIN_FALHA`.
+ * 2. Senha certa → auditoria `LOGIN_ADMIN_SUCESSO` e `{ admin }`.
  *
  * `ClienteAuthAdmin` isola o SDK do Supabase atrás de uma porta estreita
  * (mesmo padrão de `RepositorioLogin`/`RepositorioPin`) para testar sem rede.
  */
-import { erroCredenciaisInvalidas, erroWhatsappNaoCadastrado } from '@/server/http/erros';
-import { mascararWhatsapp } from './segundo-fator';
+import { erroCredenciaisInvalidas } from '@/server/http/erros';
 
-export type ResultadoEntrada =
-  | { ok: true; userId: string; email: string; nome: string | null; whatsapp: string | null; sessionId: string }
-  | { ok: false };
+export type ResultadoEntrada = { ok: true; userId: string; email: string; nome: string | null } | { ok: false };
 
 /** Porta de acesso ao Supabase Auth — a rota real implementa isto sobre `@supabase/ssr`. */
 export interface ClienteAuthAdmin {
@@ -38,7 +28,6 @@ export interface EventoAdminLoginAuditoria {
 
 export interface RepositorioAdminLogin {
   auditar(evento: EventoAdminLoginAuditoria): Promise<void>;
-  enviarCodigo(params: { userId: string; sessionId: string; whatsapp: string }): Promise<void>;
 }
 
 export interface ParametrosAdminLogin {
@@ -47,9 +36,7 @@ export interface ParametrosAdminLogin {
 }
 
 export interface RespostaAdminLogin {
-  precisaCodigo: true;
-  /** Últimos dígitos do WhatsApp para onde o código foi (`•••• 4321`). */
-  destino: string;
+  admin: { id: string; email: string; nome: string | null };
 }
 
 export async function processarAdminLogin(
@@ -64,12 +51,6 @@ export async function processarAdminLogin(
     throw erroCredenciaisInvalidas();
   }
 
-  if (!entrada.whatsapp) {
-    // Senha correta, mas sem segundo fator — não é sucesso nem tentativa de
-    // senha errada, então não audita. `WHATSAPP_NAO_CADASTRADO` já é o sinal.
-    throw erroWhatsappNaoCadastrado();
-  }
-
-  await repo.enviarCodigo({ userId: entrada.userId, sessionId: entrada.sessionId, whatsapp: entrada.whatsapp });
-  return { precisaCodigo: true, destino: mascararWhatsapp(entrada.whatsapp) };
+  await repo.auditar({ sucesso: true, email: entrada.email, adminId: entrada.userId });
+  return { admin: { id: entrada.userId, email: entrada.email, nome: entrada.nome } };
 }

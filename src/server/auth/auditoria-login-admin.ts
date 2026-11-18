@@ -1,7 +1,6 @@
 /**
  * Auditoria `LOGIN_ADMIN_SUCESSO` / `LOGIN_ADMIN_FALHA` (`API-AUTH-006`) —
- * compartilhada pela etapa de senha (`/api/auth/admin/login`) e pela de
- * código (`/api/auth/admin/codigo/verificar`).
+ * usada por `POST /api/auth/admin/login`.
  */
 import type { PrismaClient } from '@prisma/client';
 import { emTransacao } from '@/server/db/tx';
